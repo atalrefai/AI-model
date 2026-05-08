@@ -1,0 +1,75 @@
+{
+  "links": [
+    {
+      "name": "Local SQLite",
+      "url": "sqlite:///training_demo.db",
+      "last_used": 1778147804,
+      "id": "4a406a6d80",
+      "type": "custom",
+      "fields": {},
+      "tables": "",
+      "sample_rows": 5,
+      "status": "saved",
+      "saved_at": 1778148995,
+      "last_trained_at": null,
+      "last_error": null,
+      "last_added_docs": 0,
+      "last_table_count": 0
+    },
+    {
+      "id": "ccd2d4ba80",
+      "name": "SQLite Demo Preset",
+      "type": "sqlite",
+      "fields": {
+        "database": "training_demo.db"
+      },
+      "url": "sqlite:///training_demo.db",
+      "tables": "products",
+      "sample_rows": 3,
+      "saved_at": 1778148995,
+      "status": "completed",
+      "last_trained_at": 1778148995,
+      "last_error": null,
+      "last_added_docs": 1,
+      "last_table_count": 1
+    },
+    {
+      "id": "966b8cecae",
+      "name": "portal test",
+      "type": "mysql",
+      "fields": {
+        "host": "localhost",
+        "port": "3306",
+        "user": "root",
+        "password": "",
+        "database": "adtc"
+      },
+      "url": "mysql+pymysql://root@localhost:3306/adtc",
+      "tables": "apps,relation_table,users",
+      "sample_rows": 5,
+      "saved_at": 1778149271,
+      "status": "completed",
+      "last_trained_at": 1778152401,
+      "last_error": null,
+      "last_added_docs": 4,
+      "last_table_count": 3
+    },
+    {
+      "id": "8191319b8f",
+      "name": "Demo Detailed Run",
+      "type": "sqlite",
+      "fields": {
+        "database": "training_demo.db"
+      },
+      "url": "sqlite:///training_demo.db",
+      "tables": "products",
+      "sample_rows": 3,
+      "saved_at": 1778149563,
+      "status": "completed",
+      "last_trained_at": 1778149563,
+      "last_error": null,
+      "last_added_docs": 1,
+      "last_table_count": 1
+    }
+  ]
+}

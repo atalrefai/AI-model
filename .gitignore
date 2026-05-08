@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# OS
+Thumbs.db
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Project artifacts
+_rendered.html
+_served.html
+_served.js
+_embedded.js
+
+# Large model weights (>100MB — push via Git LFS or download separately)
+*.gguf
+*.whl
+
+# Local memory / generated data
+chat_memory/
+training_memory/adtc_files/
+training_memory/dataset_files/
+training_memory/audit_log.jsonl
+training_memory/feedback_log.jsonl
+training_memory/learning_backlog.jsonl
+
+# Eval reports
+EVAL_REPORT_*.json

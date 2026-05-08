@@ -1,0 +1,1165 @@
+{
+  "datasets": [
+    {
+      "id": "adtc_8c769f7820",
+      "name": "HP",
+      "topic": "About",
+      "files": [
+        {
+          "name": "Operation  Hours.pdf",
+          "original_name": "Operation  Hours.pdf",
+          "ext": ".pdf",
+          "kind": "pdf",
+          "size_bytes": 108120
+        },
+        {
+          "name": "Hospital and Clinic Location.pdf",
+          "original_name": "Hospital and Clinic Location.pdf",
+          "ext": ".pdf",
+          "kind": "pdf",
+          "size_bytes": 80289
+        },
+        {
+          "name": "HP - Dental.pdf",
+          "original_name": "HP - Dental.pdf",
+          "ext": ".pdf",
+          "kind": "pdf",
+          "size_bytes": 91291
+        }
+      ],
+      "status": "completed",
+      "saved_at": 1778234568,
+      "last_trained_at": 1778237022,
+      "last_error": null,
+      "last_added_docs": 16,
+      "last_results": [
+        {
+          "file": "Operation  Hours.pdf",
+          "kind": "pdf",
+          "size_bytes": 108120,
+          "docs_added": 4,
+          "units": 2819,
+          "quality_score": 96,
+          "training_confidence": 80,
+          "extraction_quality_flags": [
+            "high_duplicate_lines"
+          ]
+        },
+        {
+          "file": "Hospital and Clinic Location.pdf",
+          "kind": "pdf",
+          "size_bytes": 80289,
+          "docs_added": 2,
+          "units": 1554,
+          "quality_score": 96,
+          "training_confidence": 73,
+          "extraction_quality_flags": []
+        },
+        {
+          "file": "HP - Dental.pdf",
+          "kind": "pdf",
+          "size_bytes": 91291,
+          "docs_added": 3,
+          "units": 2433,
+          "quality_score": 96,
+          "training_confidence": 73,
+          "extraction_quality_flags": []
+        }
+      ],
+      "doc_ids": [
+        "300f48b54c34",
+        "c01a1fd1df4c",
+        "a11c30bce4e0",
+        "26355fdadc71",
+        "17cc821f85ab",
+        "466cc48ae7e7",
+        "89133359d887",
+        "738d433aa465",
+        "e4304133c687",
+        "49f67efd2c70",
+        "3102dbff13d3",
+        "4a66065af44d",
+        "ab97f7ac400c",
+        "4de355f17e9b",
+        "b841602ccc92",
+        "69112e4775dc",
+        "983920391970",
+        "5b12e0be1203",
+        "11e0cc4ec331",
+        "0ef427c8ec46",
+        "aeb3e3d7ce08",
+        "3a8dc2feb447",
+        "92308c0a47fa",
+        "886dc4377bb8",
+        "cc0ab4b485aa",
+        "87661345c398",
+        "1b375a388c6d",
+        "a6158c7bcbb4",
+        "d3aed3a44c67",
+        "5801efe1f4ce",
+        "2d54195ffe82",
+        "f1b1ff512982",
+        "07ec62610be1",
+        "6f195d72bf6f",
+        "f4990f6a295a",
+        "54dfd127012e",
+        "bfeb2f9c92cb",
+        "8e3c044634e9",
+        "5b13ed8d7082",
+        "b5511eb74330",
+        "2390b353bff2"
+      ],
+      "relationships": [],
+      "insights": [
+        "ADTC dataset 'HP' topic 'About' processed 3 files.",
+        "Total ADTC knowledge docs added: 15",
+        "Detected cross-file relationships: 0",
+        "Top understood facts:",
+        "- Operation  Hours.pdf: The new hours will be from 10:00 AM to 4:00 PM. This decision has been made by Management.",
+        "- Operation  Hours.pdf: https://mubadala-prod.cxoneexpert.ai/M42_-_Facilities/HealthPoint/About_us/Operation__Hours",
+        "- Operation  Hours.pdf: \u2022 Clinics operating on Saturday and Sunday: 9:00 AM to 4:00 PM",
+        "- Hospital and Clinic Location.pdf: https://mubadala-prod.cxoneexpert.ai/M42_-_Facilities/HealthPoint/About_us/Hospital_and_Clinic_Location",
+        "- Hospital and Clinic Location.pdf: Occupational Medicine Clinic - L2 ENT",
+        "- Hospital and Clinic Location.pdf: Updated: Fri, 08 May 2026 04:55:27 GMT",
+        "- HP - Dental.pdf: https://mubadala-prod.cxoneexpert.ai/?title=M42_-_Facilities/HealthPoint/HP_-_Specialties_%26_Services/HP_-_Dental",
+        "- HP - Dental.pdf: Walk-in : Yes - Before 3:00 pm",
+        "- HP - Dental.pdf: Updated: Fri, 08 May 2026 04:32:25 GMT"
+      ],
+      "learned_details": [
+        {
+          "file": "Operation  Hours.pdf",
+          "kind": "pdf",
+          "char_count": 2819,
+          "content_preview": "Operation Hours Update! 19/03/2026 ? Please be informed that Healthpoint clinics will be closed from 19th \u2013 22nd March 2026 for Eid holiday. ? Normal operations will resume Monday 23-March-2026. Update! 18/02/2025 There will be slight changes to our Sunday operating hours during Ramadan - February 22 and March 1, 2026. The new hours will be from 10:00 AM to 4:00 PM. This decision has been made by Management. Department Operating Days Operating Hours AM PM Family Medicine & Internal Medicine Monday - Thursday 9:00-16:00 20:00-01:00 Friday 9:00-16:00 - Sunday 10:00 - 16: 00 - Dentistry Monday - Thursday 9:00-16:00 20:00-01:00 Friday 9:00-16:00 - https://mubadala-prod.cxoneexpert.ai/M42_-_Facilities/HealthPoint/About_us/Operation__Hours Updated: Fri, 08 May 2026 04:55:07 GMT Powered by 1 Sunday 10:00 - 16: 00 - Orthopedics & Sports Medicine Monday - Thursday 9:00-16:00 20:00-01:00 Friday 9:00-16:00 - Sunday 10:00 - 16: 00 - Phlebotomy Monday - Thursday 9:00-16:00 20:00-01:00 Friday 9:00-16:00 - Sunday 10:00 - 16: 00 - Pharmacy Monday - Thursday 9:00-16:30 20:00-01:00 Friday 9:00-16:30 - Sunday 10:00 - 16: 00 - OTB Monday - Friday 9:00-16:00 Update! 18/02/2025 HP \u2013 Ramadan Operating Hours https://mubadala-prod.cxoneexpert.ai/M42_-_Facilities/HealthPoint/About_us/Operation__Hours Updated: Fri, 08 May 2026 04:55:07 GMT Powered by 2 Clinic and Laboratory operating hours will be as follows: \u2022 Monday to Friday: 09:00 AM to 04:00 PM - Day Shift \u2022 Monday to Thursday: 8:00 PM to 1:00 AM - Evening Shift \u2022 Clinics operating on Saturday and Sunday: 9:00 AM to 4:00 PM From Saturday, March ",
+          "units_read": 2819,
+          "chunks_created": 4,
+          "schema_keys": [],
+          "top_terms": [
+            "00",
+            "monday",
+            "16",
+            "friday",
+            "sunday",
+            "2026",
+            "shift",
+            "am",
+            "pm",
+            "will",
+            "10",
+            "thursday"
+          ],
+          "understanding_summary": "Extracted 8 key fact line(s). Detected 1 website/link reference(s). Detected 3 phone/hotline reference(s). PDF pages: 4/4 with text; avg chars/page 703.",
+          "key_facts": [
+            "The new hours will be from 10:00 AM to 4:00 PM. This decision has been made by Management.",
+            "https://mubadala-prod.cxoneexpert.ai/M42_-_Facilities/HealthPoint/About_us/Operation__Hours",
+            "\u2022 Clinics operating on Saturday and Sunday: 9:00 AM to 4:00 PM",
+            "Sunday shifts. However, only the Dentistry department will have evening shifts from 8:00 PM to 1:00 AM, from",
+            "? Please be informed that Healthpoint clinics will be closed from 19th \u2013 22nd March 2026 for Eid holiday.",
+            "There will be slight changes to our Sunday operating hours during Ramadan - February 22 and March 1, 2026.",
+            "From Saturday, March 7, 2026, until the last day of Ramadan, there will be no evening shifts and no Saturday and",
+            "Starting from Sunday, March 8, 2026, until the last day of Ramadan, there will be no evening shifts"
+          ],
+          "contact_signals": {
+            "urls": [
+              "https://mubadala-prod.cxoneexpert.ai/M42_-_Facilities/HealthPoint/About_us/Operation__Hours"
+            ],
+            "emails": [],
+            "phones": [
+              "0800 - 1645",
+              "1200 - 1400",
+              "0800-1700"
+            ]
+          },
+          "unclear_points": [],
+          "quality_score": 96,
+          "extraction_quality": {
+            "char_count": 2819,
+            "line_count": 85,
+            "non_empty_lines": 82,
+            "duplicate_line_ratio": 0.317,
+            "noise_char_ratio": 0.004,
+            "empty_line_ratio": 0.035,
+            "flags": [
+              "high_duplicate_lines"
+            ]
+          },
+          "signal_metrics": {
+            "char_count": 2819,
+            "token_count": 422,
+            "unique_terms_count": 117,
+            "lexical_density": 0.277,
+            "digit_density": 0.1383
+          },
+          "topic_coverage": {
+            "location": 0,
+            "contacts": 1,
+            "services": 6,
+            "schedule": 10,
+            "insurance": 0,
+            "topic": "About",
+            "coverage_score": 60
+          },
+          "qa_probes": [
+            {
+              "id": "location",
+              "question": "Where is the hospital/clinic located?",
+              "answerable": false,
+              "confidence": 25,
+              "evidence": []
+            },
+            {
+              "id": "contacts",
+              "question": "How can users contact this provider?",
+              "answerable": true,
+              "confidence": 65,
+              "evidence": [
+                "Healthpoint Website: Click Here"
+              ]
+            },
+            {
+              "id": "services",
+              "question": "What services or clinics are available?",
+              "answerable": true,
+              "confidence": 90,
+              "evidence": [
+                "? Please be informed that Healthpoint clinics will be closed from 19th \u2013 22nd March 2026 for Eid holiday.",
+                "Department Operating Days"
+              ]
+            },
+            {
+              "id": "schedule",
+              "question": "What are opening hours/appointment details?",
+              "answerable": true,
+              "confidence": 90,
+              "evidence": [
+                "Operation Hours",
+                "There will be slight changes to our Sunday operating hours during Ramadan - February 22 and March 1, 2026."
+              ]
+            }
+          ],
+          "training_confidence": 80,
+          "understanding_pipeline": {
+            "step_1_extract": {
+              "kind": "pdf",
+              "chars": 2819,
+              "units": 2819,
+              "chunks_written": 4
+            },
+            "step_2_analyze": {
+              "key_facts": 8,
+              "top_terms": 12,
+              "contacts_detected": {
+                "urls": 1,
+                "emails": 0,
+                "phones": 3
+              },
+              "unclear_points": 0
+            },
+            "step_3_answerability": {
+              "coverage_score": 60,
+              "qa_probe_count": 4,
+              "qa_probe_answerable": 3,
+              "confidence": 80
+            }
+          },
+          "section_titles": [
+            "Operation Hours",
+            "Update! 19/03/2026",
+            "? Normal operations will resume Monday 23-March-2026.",
+            "Update! 18/02/2025",
+            "Department Operating Days",
+            "Operating Hours",
+            "AM PM",
+            "Family Medicine & Internal",
+            "Medicine",
+            "Dentistry",
+            "Powered by",
+            "Orthopedics & Sports"
+          ],
+          "pdf_stats": {
+            "pages_total": 4,
+            "pages_with_text": 4,
+            "pages_low_text": 0,
+            "avg_chars_per_page": 703,
+            "page_char_counts": [
+              795,
+              551,
+              1208,
+              259
+            ],
+            "page_samples": [
+              {
+                "page": 1,
+                "chars": 795,
+                "sample": "Operation Hours Update! 19/03/2026 ? Please be informed that Healthpoint clinics will be closed from 19th \u2013 22nd March 2026 for Eid holiday. ? Normal operations will resume Monday 23-March-2026. Update! 18/02/2025 There "
+              },
+              {
+                "page": 2,
+                "chars": 551,
+                "sample": "Sunday 10:00 - 16: 00 - Orthopedics & Sports Medicine Monday - Thursday 9:00-16:00 20:00-01:00 Friday 9:00-16:00 - Sunday 10:00 - 16: 00 - Phlebotomy Monday - Thursday 9:00-16:00 20:00-01:00 Friday 9:00-16:00 - Sunday 10"
+              },
+              {
+                "page": 3,
+                "chars": 1208,
+                "sample": "Clinic and Laboratory operating hours will be as follows: \u2022 Monday to Friday: 09:00 AM to 04:00 PM - Day Shift \u2022 Monday to Thursday: 8:00 PM to 1:00 AM - Evening Shift \u2022 Clinics operating on Saturday and Sunday: 9:00 AM "
+              },
+              {
+                "page": 4,
+                "chars": 259,
+                "sample": "Sunday : 10:00 to 18:00 Medical Records Department: Monday - Friday 0800-1700 OTB office: Monday - Friday 0800-1700 https://mubadala-prod.cxoneexpert.ai/M42_-_Facilities/HealthPoint/About_us/Operation__Hours Updated: Fri"
+              }
+            ]
+          },
+          "doc_ids": [
+            "87661345c398",
+            "1b375a388c6d",
+            "a6158c7bcbb4",
+            "d3aed3a44c67"
+          ],
+          "understanding_doc_id": "5801efe1f4ce",
+          "summary_doc_id": "2d54195ffe82"
+        },
+        {
+          "file": "Hospital and Clinic Location.pdf",
+          "kind": "pdf",
+          "char_count": 1554,
+          "content_preview": "Hospital and Clinic Location Hospital Location \u0623\u0628\u0648 \u0638\u0628\u064a- \u0645\u0633\u062a\u0634\u0641\u0649 \u0647\u064a\u0644\u062b \u0628\u0648\u064a\u0646\u062a- \u0628\u064a\u0646 \u0628\u0648\u0627\u0628\u06291\u0648\u0628\u0648\u0627\u0628\u06296 Zayed Sports City, Between Gate 1 and 6 - Entrance - United Arab Emirates Media, iframe, embed and object tags are not supported inside of a PDF. Update! 04/08/2025 Please be informed that a flower shop is now available at Healthpoint (HP) Clinic Locations L3 Dentistry Plastic Surgery Dermatology Wards-HP Vascular Medicine L2 L1 \u2022 Laboratory \u2022 Bariatric and Metabolic \u2022 Digestive Diseases \"Gastro\" \u2022 General Surgery \u2022 Psychology \u2022 Pulmonology \u2022 Psychology (for Bariatric) GF Orthopedics & Sport Medicine IFHAS Clinic (Current Location L2- FM) Pharmacy Cafe P1 https://mubadala-prod.cxoneexpert.ai/M42_-_Facilities/HealthPoint/About_us/Hospital_and_Clinic_Location Updated: Fri, 08 May 2026 04:55:27 GMT Powered by 1 Oral and Maxillofacial (same ENT Clinic) Prosthetic & Orthotic (P & O Clinic) Family Medicine/ Senior Health Internal Medicine PM&R and Neuro Rehabilitation Physiotherapy & Rehabilitation Spine female Wooridul Spine Centre ENT Neurology Rheumatology \"IP ward area\" Infusion \"IP ward area\" Wound care Wards-AMANA Ortho Spine Physicians Podiatry Occupational Medicine Clinic - L2 ENT Clinic \u2022 Dietitian \u2022 Anesthesia / Pain Management \u2022 Operating Theaters / ICU \u2022 Urology \u2022 Psychiatry \u2022 SLT \u2022 Cardiology Clinic Diagnostic Imagining/ Radiology Physiotherapy & Rehabilitation Medical Records https://mubadala-prod.cxoneexpert.ai/M42_-_Facilities/HealthPoint/About_us/Hospital_and_Clinic_Location Updated: Fri, 08 May 2026 04:55:27 GMT Powered by 2",
+          "units_read": 1554,
+          "chunks_created": 2,
+          "schema_keys": [],
+          "top_terms": [
+            "clinic",
+            "medicine",
+            "location",
+            "ward",
+            "04",
+            "08",
+            "healthpoint",
+            "l2",
+            "ent",
+            "rehabilitation",
+            "spine",
+            "hospital"
+          ],
+          "understanding_summary": "Extracted 8 key fact line(s). Detected 1 website/link reference(s). PDF pages: 2/2 with text; avg chars/page 776.",
+          "key_facts": [
+            "https://mubadala-prod.cxoneexpert.ai/M42_-_Facilities/HealthPoint/About_us/Hospital_and_Clinic_Location",
+            "Occupational Medicine Clinic - L2 ENT",
+            "Updated: Fri, 08 May 2026 04:55:27 GMT",
+            "\u0623\u0628\u0648 \u0638\u0628\u064a- \u0645\u0633\u062a\u0634\u0641\u0649 \u0647\u064a\u0644\u062b \u0628\u0648\u064a\u0646\u062a- \u0628\u064a\u0646 \u0628\u0648\u0627\u0628\u06291\u0648\u0628\u0648\u0627\u0628\u06296",
+            "Zayed Sports City, Between Gate 1 and 6 - Entrance - United Arab Emirates",
+            "Update! 04/08/2025",
+            "Hospital and Clinic Location",
+            "Hospital Location"
+          ],
+          "contact_signals": {
+            "urls": [
+              "https://mubadala-prod.cxoneexpert.ai/M42_-_Facilities/HealthPoint/About_us/Hospital_and_Clinic_Location"
+            ],
+            "emails": [],
+            "phones": []
+          },
+          "unclear_points": [],
+          "quality_score": 96,
+          "extraction_quality": {
+            "char_count": 1554,
+            "line_count": 70,
+            "non_empty_lines": 69,
+            "duplicate_line_ratio": 0.043,
+            "noise_char_ratio": 0.017,
+            "empty_line_ratio": 0.014,
+            "flags": []
+          },
+          "signal_metrics": {
+            "char_count": 1554,
+            "token_count": 187,
+            "unique_terms_count": 130,
+            "lexical_density": 0.695,
+            "digit_density": 0.0309
+          },
+          "topic_coverage": {
+            "location": 10,
+            "contacts": 0,
+            "services": 12,
+            "schedule": 0,
+            "insurance": 0,
+            "topic": "About",
+            "coverage_score": 40
+          },
+          "qa_probes": [
+            {
+              "id": "location",
+              "question": "Where is the hospital/clinic located?",
+              "answerable": true,
+              "confidence": 90,
+              "evidence": [
+                "Hospital and Clinic Location",
+                "Hospital Location"
+              ]
+            },
+            {
+              "id": "contacts",
+              "question": "How can users contact this provider?",
+              "answerable": false,
+              "confidence": 25,
+              "evidence": []
+            },
+            {
+              "id": "services",
+              "question": "What services or clinics are available?",
+              "answerable": true,
+              "confidence": 90,
+              "evidence": [
+                "Hospital and Clinic Location",
+                "Clinic Locations"
+              ]
+            },
+            {
+              "id": "schedule",
+              "question": "What are opening hours/appointment details?",
+              "answerable": false,
+              "confidence": 25,
+              "evidence": []
+            }
+          ],
+          "training_confidence": 73,
+          "understanding_pipeline": {
+            "step_1_extract": {
+              "kind": "pdf",
+              "chars": 1554,
+              "units": 1554,
+              "chunks_written": 2
+            },
+            "step_2_analyze": {
+              "key_facts": 8,
+              "top_terms": 12,
+              "contacts_detected": {
+                "urls": 1,
+                "emails": 0,
+                "phones": 0
+              },
+              "unclear_points": 0
+            },
+            "step_3_answerability": {
+              "coverage_score": 40,
+              "qa_probe_count": 4,
+              "qa_probe_answerable": 2,
+              "confidence": 73
+            }
+          },
+          "section_titles": [
+            "Hospital and Clinic Location",
+            "Hospital Location",
+            "\u0623\u0628\u0648 \u0638\u0628\u064a- \u0645\u0633\u062a\u0634\u0641\u0649 \u0647\u064a\u0644\u062b \u0628\u0648\u064a\u0646\u062a- \u0628\u064a\u0646 \u0628\u0648\u0627\u0628\u06291\u0648\u0628\u0648\u0627\u0628\u06296",
+            "Update! 04/08/2025",
+            "Clinic Locations",
+            "Dentistry",
+            "Plastic Surgery",
+            "Dermatology",
+            "Wards-HP",
+            "Vascular Medicine",
+            "Laboratory",
+            "Bariatric and Metabolic"
+          ],
+          "pdf_stats": {
+            "pages_total": 2,
+            "pages_with_text": 2,
+            "pages_low_text": 0,
+            "avg_chars_per_page": 776,
+            "page_char_counts": [
+              810,
+              742
+            ],
+            "page_samples": [
+              {
+                "page": 1,
+                "chars": 810,
+                "sample": "Hospital and Clinic Location Hospital Location \u0623\u0628\u0648 \u0638\u0628\u064a- \u0645\u0633\u062a\u0634\u0641\u0649 \u0647\u064a\u0644\u062b \u0628\u0648\u064a\u0646\u062a- \u0628\u064a\u0646 \u0628\u0648\u0627\u0628\u06291\u0648\u0628\u0648\u0627\u0628\u06296 Zayed Sports City, Between Gate 1 and 6 - Entrance - United Arab Emirates Media, iframe, embed and object tags are not supporte"
+              },
+              {
+                "page": 2,
+                "chars": 742,
+                "sample": "Oral and Maxillofacial (same ENT Clinic) Prosthetic & Orthotic (P & O Clinic) Family Medicine/ Senior Health Internal Medicine PM&R and Neuro Rehabilitation Physiotherapy & Rehabilitation Spine female Wooridul Spine Cent"
+              }
+            ]
+          },
+          "doc_ids": [
+            "f1b1ff512982",
+            "07ec62610be1"
+          ],
+          "understanding_doc_id": "6f195d72bf6f",
+          "summary_doc_id": "f4990f6a295a"
+        },
+        {
+          "file": "HP - Dental.pdf",
+          "kind": "pdf",
+          "char_count": 2433,
+          "content_preview": "HP - Dental Walk-in : Yes - Before 3:00 pm Doctor Total Patients in Schedule Overbook & Guidelines All GPs (Dr. Eman - Dr. Tabarak - Dr. Ilham) Not more than 14 pts Not more than 14 pts \u2013(Next to OP New) For Dr.Shaima ( ?\u200d??Please be advised that no overbooking of patients should be done beyond Dr. Shaimaa\u2019s scheduled capacity, ? Any overbooking will be managed only with her direct approval and must be booked exclusively by her authorization.) Dr. Haris Not more than 19 pts can be booked on the dedicated slots (45 minutes) kindly ensure to inform the patient about the waiting time. Orthodontists Dr. Tayseer - Dr. Sumit - Dr. Hanan Al Ansari Not more than 20 pt For new patients, schedule a 15-minute appointment at any available time. For follow-up adjustments, schedule a 30-minute appointment only if it follows a 30-minute appointment. overbook next to 30 min appointment NOT 60 min Appointment https://mubadala-prod.cxoneexpert.ai/?title=M42_-_Facilities/HealthPoint/HP_-_Specialties_%26_Services/HP_-_Dental Updated: Fri, 08 May 2026 04:32:25 GMT Powered by 1 Doctor Total Patients in Schedule Overbook & Guidelines Dr. Nouf Not more than 14 pts- any time except end of the shift Dr. Stauros 13 Only new patient appointments, suture removal, and scaling & polishing. Should be scheduled at the end of a long surgical procedure. IFHAS /DENTAL SCREENING N/A IFHAS appointment can be booked with following physician only: Dr. Nouf Al Harbi, Dr. Eman Al Swah, Dr. Fatima Al Suwidi, Dr. Hanan Al Ansari ( callback request : Medical ), Dr. Tayseer \u2714\u2714 Please clearly inform the patient that the",
+          "units_read": 2433,
+          "chunks_created": 3,
+          "schema_keys": [],
+          "top_terms": [
+            "dr",
+            "dentist",
+            "dental",
+            "hp",
+            "patient",
+            "not",
+            "appointment",
+            "hp_",
+            "more",
+            "than",
+            "al",
+            "webp"
+          ],
+          "understanding_summary": "Extracted 8 key fact line(s). Detected 1 website/link reference(s). PDF pages: 3/3 with text; avg chars/page 809.",
+          "key_facts": [
+            "https://mubadala-prod.cxoneexpert.ai/?title=M42_-_Facilities/HealthPoint/HP_-_Specialties_%26_Services/HP_-_Dental",
+            "Walk-in : Yes - Before 3:00 pm",
+            "Updated: Fri, 08 May 2026 04:32:25 GMT",
+            "Tabarak - Dr. Ilham) Not more than 14 pts",
+            "Not more than 14 pts \u2013(Next to OP New)",
+            "Dr. Haris Not more than 19 pts",
+            "can be booked on the dedicated slots (45 minutes)",
+            "Not more than 20 pt"
+          ],
+          "contact_signals": {
+            "urls": [
+              "https://mubadala-prod.cxoneexpert.ai/?title=M42_-_Facilities/HealthPoint/HP_-_Specialties_%26_Services/HP_-_Dental"
+            ],
+            "emails": [],
+            "phones": []
+          },
+          "unclear_points": [],
+          "quality_score": 96,
+          "extraction_quality": {
+            "char_count": 2433,
+            "line_count": 76,
+            "non_empty_lines": 74,
+            "duplicate_line_ratio": 0.122,
+            "noise_char_ratio": 0.009,
+            "empty_line_ratio": 0.026,
+            "flags": []
+          },
+          "signal_metrics": {
+            "char_count": 2433,
+            "token_count": 331,
+            "unique_terms_count": 150,
+            "lexical_density": 0.453,
+            "digit_density": 0.0321
+          },
+          "topic_coverage": {
+            "location": 0,
+            "contacts": 0,
+            "services": 3,
+            "schedule": 7,
+            "insurance": 0,
+            "topic": "About",
+            "coverage_score": 40
+          },
+          "qa_probes": [
+            {
+              "id": "location",
+              "question": "Where is the hospital/clinic located?",
+              "answerable": false,
+              "confidence": 25,
+              "evidence": []
+            },
+            {
+              "id": "contacts",
+              "question": "How can users contact this provider?",
+              "answerable": false,
+              "confidence": 25,
+              "evidence": []
+            },
+            {
+              "id": "services",
+              "question": "What services or clinics are available?",
+              "answerable": true,
+              "confidence": 90,
+              "evidence": [
+                "https://mubadala-prod.cxoneexpert.ai/?title=M42_-_Facilities/HealthPoint/HP_-_Specialties_%26_Services/HP_-_Dental",
+                "https://mubadala-prod.cxoneexpert.ai/?title=M42_-_Facilities/HealthPoint/HP_-_Specialties_%26_Services/HP_-_Dental"
+              ]
+            },
+            {
+              "id": "schedule",
+              "question": "What are opening hours/appointment details?",
+              "answerable": true,
+              "confidence": 90,
+              "evidence": [
+                "For new patients, schedule a 15-minute appointment at",
+                "appointment only if it follows a 30-minute appointment."
+              ]
+            }
+          ],
+          "training_confidence": 73,
+          "understanding_pipeline": {
+            "step_1_extract": {
+              "kind": "pdf",
+              "chars": 2433,
+              "units": 2433,
+              "chunks_written": 3
+            },
+            "step_2_analyze": {
+              "key_facts": 8,
+              "top_terms": 12,
+              "contacts_detected": {
+                "urls": 1,
+                "emails": 0,
+                "phones": 0
+              },
+              "unclear_points": 0
+            },
+            "step_3_answerability": {
+              "coverage_score": 40,
+              "qa_probe_count": 4,
+              "qa_probe_answerable": 2,
+              "confidence": 73
+            }
+          },
+          "section_titles": [
+            "HP - Dental",
+            "Doctor Total Patients in",
+            "Schedule Overbook & Guidelines",
+            "All GPs (Dr. Eman - Dr.",
+            "For Dr.Shaima ( ?\u200d??Please be advised that no",
+            "overbooking of patients should be done beyond Dr.",
+            "Shaimaa\u2019s scheduled capacity, ? Any overbooking will",
+            "booked exclusively by her authorization.)",
+            "Dr. Haris Not more than 19 pts",
+            "time.",
+            "Orthodontists",
+            "Dr. Tayseer - Dr. Sumit"
+          ],
+          "pdf_stats": {
+            "pages_total": 3,
+            "pages_with_text": 3,
+            "pages_low_text": 0,
+            "avg_chars_per_page": 809,
+            "page_char_counts": [
+              1072,
+              1012,
+              345
+            ],
+            "page_samples": [
+              {
+                "page": 1,
+                "chars": 1072,
+                "sample": "HP - Dental Walk-in : Yes - Before 3:00 pm Doctor Total Patients in Schedule Overbook & Guidelines All GPs (Dr. Eman - Dr. Tabarak - Dr. Ilham) Not more than 14 pts Not more than 14 pts \u2013(Next to OP New) For Dr.Shaima ( "
+              },
+              {
+                "page": 2,
+                "chars": 1012,
+                "sample": "Doctor Total Patients in Schedule Overbook & Guidelines Dr. Nouf Not more than 14 pts- any time except end of the shift Dr. Stauros 13 Only new patient appointments, suture removal, and scaling & polishing. Should be sch"
+              },
+              {
+                "page": 3,
+                "chars": 345,
+                "sample": "dental.webp HP - Dental - Prosthodontist walk- in.webpHP - Dental Walk-in Pool periodontics.webp HP - Periodontics Dentists dental.webp HP - Dental - Hygienist HP - Dental Guide https://mubadala-prod.cxoneexpert.ai/?titl"
+              }
+            ]
+          },
+          "doc_ids": [
+            "54dfd127012e",
+            "bfeb2f9c92cb",
+            "8e3c044634e9"
+          ],
+          "understanding_doc_id": "5b13ed8d7082",
+          "summary_doc_id": "b5511eb74330"
+        }
+      ],
+      "integration_report": {
+        "knowledge_source": "adtc",
+        "dataset_id": "adtc_8c769f7820",
+        "dataset_name": "HP",
+        "topic": "About",
+        "docs_written": 16,
+        "doc_ids": [
+          "87661345c398",
+          "1b375a388c6d",
+          "a6158c7bcbb4",
+          "d3aed3a44c67",
+          "5801efe1f4ce",
+          "2d54195ffe82",
+          "f1b1ff512982",
+          "07ec62610be1",
+          "6f195d72bf6f",
+          "f4990f6a295a",
+          "54dfd127012e",
+          "bfeb2f9c92cb",
+          "8e3c044634e9",
+          "5b13ed8d7082",
+          "b5511eb74330",
+          "2390b353bff2"
+        ],
+        "retrieval_note": "All ADTC docs are appended to knowledge memory and become retrievable by the same semantic overlap pipeline used by chat answers.",
+        "cross_file_reasoning_note": "Relationships are inferred from shared schema keys and summarized into ADTC summary docs for multi-file question answering.",
+        "understood_points": [
+          "Operation  Hours.pdf: The new hours will be from 10:00 AM to 4:00 PM. This decision has been made by Management.",
+          "Operation  Hours.pdf: https://mubadala-prod.cxoneexpert.ai/M42_-_Facilities/HealthPoint/About_us/Operation__Hours",
+          "Operation  Hours.pdf: \u2022 Clinics operating on Saturday and Sunday: 9:00 AM to 4:00 PM",
+          "Hospital and Clinic Location.pdf: https://mubadala-prod.cxoneexpert.ai/M42_-_Facilities/HealthPoint/About_us/Hospital_and_Clinic_Location",
+          "Hospital and Clinic Location.pdf: Occupational Medicine Clinic - L2 ENT",
+          "Hospital and Clinic Location.pdf: Updated: Fri, 08 May 2026 04:55:27 GMT",
+          "HP - Dental.pdf: https://mubadala-prod.cxoneexpert.ai/?title=M42_-_Facilities/HealthPoint/HP_-_Specialties_%26_Services/HP_-_Dental",
+          "HP - Dental.pdf: Walk-in : Yes - Before 3:00 pm",
+          "HP - Dental.pdf: Updated: Fri, 08 May 2026 04:32:25 GMT"
+        ],
+        "unclear_points": [],
+        "qa_probe_summary": {
+          "total_probes": 12,
+          "answerable_probes": 7,
+          "avg_probe_confidence": 60.8,
+          "sample": [
+            {
+              "file": "Operation  Hours.pdf",
+              "probe_id": "location",
+              "answerable": false,
+              "confidence": 25
+            },
+            {
+              "file": "Operation  Hours.pdf",
+              "probe_id": "contacts",
+              "answerable": true,
+              "confidence": 65
+            },
+            {
+              "file": "Operation  Hours.pdf",
+              "probe_id": "services",
+              "answerable": true,
+              "confidence": 90
+            },
+            {
+              "file": "Operation  Hours.pdf",
+              "probe_id": "schedule",
+              "answerable": true,
+              "confidence": 90
+            },
+            {
+              "file": "Hospital and Clinic Location.pdf",
+              "probe_id": "location",
+              "answerable": true,
+              "confidence": 90
+            },
+            {
+              "file": "Hospital and Clinic Location.pdf",
+              "probe_id": "contacts",
+              "answerable": false,
+              "confidence": 25
+            },
+            {
+              "file": "Hospital and Clinic Location.pdf",
+              "probe_id": "services",
+              "answerable": true,
+              "confidence": 90
+            },
+            {
+              "file": "Hospital and Clinic Location.pdf",
+              "probe_id": "schedule",
+              "answerable": false,
+              "confidence": 25
+            },
+            {
+              "file": "HP - Dental.pdf",
+              "probe_id": "location",
+              "answerable": false,
+              "confidence": 25
+            },
+            {
+              "file": "HP - Dental.pdf",
+              "probe_id": "contacts",
+              "answerable": false,
+              "confidence": 25
+            },
+            {
+              "file": "HP - Dental.pdf",
+              "probe_id": "services",
+              "answerable": true,
+              "confidence": 90
+            },
+            {
+              "file": "HP - Dental.pdf",
+              "probe_id": "schedule",
+              "answerable": true,
+              "confidence": 90
+            }
+          ]
+        },
+        "topic_coverage_totals": {
+          "location": 10,
+          "contacts": 1,
+          "services": 21,
+          "schedule": 17,
+          "insurance": 0
+        },
+        "knowledge_links": [
+          {
+            "from_id": "49f67efd2c70",
+            "to_id": "87661345c398",
+            "from_title": "Dataset:Operation  Hours.pdf (part 1/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 1/4)",
+            "shared_tags": [
+              "2026",
+              "hour",
+              "march",
+              "monday",
+              "operating",
+              "operation",
+              "update",
+              "will"
+            ],
+            "shared_term_count": 77,
+            "score": 34
+          },
+          {
+            "from_id": "3102dbff13d3",
+            "to_id": "1b375a388c6d",
+            "from_title": "Dataset:Operation  Hours.pdf (part 2/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 2/4)",
+            "shared_tags": [
+              "friday",
+              "medicine",
+              "monday",
+              "orthopedic",
+              "phlebotomy",
+              "sport",
+              "sunday",
+              "thursday"
+            ],
+            "shared_term_count": 48,
+            "score": 34
+          },
+          {
+            "from_id": "4a66065af44d",
+            "to_id": "a6158c7bcbb4",
+            "from_title": "Dataset:Operation  Hours.pdf (part 3/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 3/4)",
+            "shared_tags": [
+              "day",
+              "evening",
+              "friday",
+              "monday",
+              "saturday",
+              "shift",
+              "sunday",
+              "will"
+            ],
+            "shared_term_count": 80,
+            "score": 34
+          },
+          {
+            "from_id": "ab97f7ac400c",
+            "to_id": "d3aed3a44c67",
+            "from_title": "Dataset:Operation  Hours.pdf (part 4/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 4/4)",
+            "shared_tags": [
+              "0800",
+              "1700",
+              "department",
+              "friday",
+              "medical",
+              "monday",
+              "record",
+              "sunday"
+            ],
+            "shared_term_count": 38,
+            "score": 34
+          },
+          {
+            "from_id": "69112e4775dc",
+            "to_id": "f1b1ff512982",
+            "from_title": "Dataset:Hospital and Clinic Location.pdf (part 1/2)",
+            "to_title": "Dataset:Hospital and Clinic Location.pdf (part 1/2)",
+            "shared_tags": [
+              "bariatric",
+              "clinic",
+              "healthpoint",
+              "hospital",
+              "location",
+              "medicine",
+              "sport",
+              "surgery"
+            ],
+            "shared_term_count": 86,
+            "score": 34
+          },
+          {
+            "from_id": "983920391970",
+            "to_id": "07ec62610be1",
+            "from_title": "Dataset:Hospital and Clinic Location.pdf (part 2/2)",
+            "to_title": "Dataset:Hospital and Clinic Location.pdf (part 2/2)",
+            "shared_tags": [
+              "area",
+              "clinic",
+              "ent",
+              "medicine",
+              "physiotherapy",
+              "rehabilitation",
+              "spine",
+              "ward"
+            ],
+            "shared_term_count": 75,
+            "score": 34
+          },
+          {
+            "from_id": "0ef427c8ec46",
+            "to_id": "54dfd127012e",
+            "from_title": "Dataset:HP - Dental.pdf (part 1/3)",
+            "to_title": "Dataset:HP - Dental.pdf (part 1/3)",
+            "shared_tags": [
+              "appointment",
+              "minute",
+              "more",
+              "not",
+              "patient",
+              "pts",
+              "schedule",
+              "than"
+            ],
+            "shared_term_count": 105,
+            "score": 34
+          },
+          {
+            "from_id": "aeb3e3d7ce08",
+            "to_id": "bfeb2f9c92cb",
+            "from_title": "Dataset:HP - Dental.pdf (part 2/3)",
+            "to_title": "Dataset:HP - Dental.pdf (part 2/3)",
+            "shared_tags": [
+              "dentist",
+              "end",
+              "not",
+              "nouf",
+              "overbook",
+              "patient",
+              "time",
+              "webphp"
+            ],
+            "shared_term_count": 102,
+            "score": 34
+          },
+          {
+            "from_id": "3a8dc2feb447",
+            "to_id": "8e3c044634e9",
+            "from_title": "Dataset:HP - Dental.pdf (part 3/3)",
+            "to_title": "Dataset:HP - Dental.pdf (part 3/3)",
+            "shared_tags": [
+              "dental",
+              "hp_",
+              "periodontic",
+              "pool",
+              "prosthodontist",
+              "walk",
+              "webp",
+              "webphp"
+            ],
+            "shared_term_count": 37,
+            "score": 34
+          },
+          {
+            "from_id": "3102dbff13d3",
+            "to_id": "4a66065af44d",
+            "from_title": "Dataset:Operation  Hours.pdf (part 2/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 3/4)",
+            "shared_tags": [
+              "friday",
+              "monday",
+              "sunday"
+            ],
+            "shared_term_count": 37,
+            "score": 19
+          },
+          {
+            "from_id": "3102dbff13d3",
+            "to_id": "ab97f7ac400c",
+            "from_title": "Dataset:Operation  Hours.pdf (part 2/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 4/4)",
+            "shared_tags": [
+              "friday",
+              "monday",
+              "sunday"
+            ],
+            "shared_term_count": 32,
+            "score": 19
+          },
+          {
+            "from_id": "3102dbff13d3",
+            "to_id": "a6158c7bcbb4",
+            "from_title": "Dataset:Operation  Hours.pdf (part 2/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 3/4)",
+            "shared_tags": [
+              "friday",
+              "monday",
+              "sunday"
+            ],
+            "shared_term_count": 37,
+            "score": 19
+          },
+          {
+            "from_id": "3102dbff13d3",
+            "to_id": "d3aed3a44c67",
+            "from_title": "Dataset:Operation  Hours.pdf (part 2/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 4/4)",
+            "shared_tags": [
+              "friday",
+              "monday",
+              "sunday"
+            ],
+            "shared_term_count": 32,
+            "score": 19
+          },
+          {
+            "from_id": "4a66065af44d",
+            "to_id": "ab97f7ac400c",
+            "from_title": "Dataset:Operation  Hours.pdf (part 3/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 4/4)",
+            "shared_tags": [
+              "friday",
+              "monday",
+              "sunday"
+            ],
+            "shared_term_count": 34,
+            "score": 19
+          },
+          {
+            "from_id": "4a66065af44d",
+            "to_id": "1b375a388c6d",
+            "from_title": "Dataset:Operation  Hours.pdf (part 3/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 2/4)",
+            "shared_tags": [
+              "friday",
+              "monday",
+              "sunday"
+            ],
+            "shared_term_count": 37,
+            "score": 19
+          },
+          {
+            "from_id": "4a66065af44d",
+            "to_id": "d3aed3a44c67",
+            "from_title": "Dataset:Operation  Hours.pdf (part 3/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 4/4)",
+            "shared_tags": [
+              "friday",
+              "monday",
+              "sunday"
+            ],
+            "shared_term_count": 34,
+            "score": 19
+          },
+          {
+            "from_id": "ab97f7ac400c",
+            "to_id": "1b375a388c6d",
+            "from_title": "Dataset:Operation  Hours.pdf (part 4/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 2/4)",
+            "shared_tags": [
+              "friday",
+              "monday",
+              "sunday"
+            ],
+            "shared_term_count": 32,
+            "score": 19
+          },
+          {
+            "from_id": "ab97f7ac400c",
+            "to_id": "a6158c7bcbb4",
+            "from_title": "Dataset:Operation  Hours.pdf (part 4/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 3/4)",
+            "shared_tags": [
+              "friday",
+              "monday",
+              "sunday"
+            ],
+            "shared_term_count": 34,
+            "score": 19
+          },
+          {
+            "from_id": "1b375a388c6d",
+            "to_id": "a6158c7bcbb4",
+            "from_title": "Dataset:Operation  Hours.pdf (part 2/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 3/4)",
+            "shared_tags": [
+              "friday",
+              "monday",
+              "sunday"
+            ],
+            "shared_term_count": 37,
+            "score": 19
+          },
+          {
+            "from_id": "1b375a388c6d",
+            "to_id": "d3aed3a44c67",
+            "from_title": "Dataset:Operation  Hours.pdf (part 2/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 4/4)",
+            "shared_tags": [
+              "friday",
+              "monday",
+              "sunday"
+            ],
+            "shared_term_count": 32,
+            "score": 19
+          },
+          {
+            "from_id": "a6158c7bcbb4",
+            "to_id": "d3aed3a44c67",
+            "from_title": "Dataset:Operation  Hours.pdf (part 3/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 4/4)",
+            "shared_tags": [
+              "friday",
+              "monday",
+              "sunday"
+            ],
+            "shared_term_count": 34,
+            "score": 19
+          },
+          {
+            "from_id": "49f67efd2c70",
+            "to_id": "4a66065af44d",
+            "from_title": "Dataset:Operation  Hours.pdf (part 1/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 3/4)",
+            "shared_tags": [
+              "monday",
+              "will"
+            ],
+            "shared_term_count": 45,
+            "score": 16
+          },
+          {
+            "from_id": "49f67efd2c70",
+            "to_id": "a6158c7bcbb4",
+            "from_title": "Dataset:Operation  Hours.pdf (part 1/4)",
+            "to_title": "Dataset:Operation  Hours.pdf (part 3/4)",
+            "shared_tags": [
+              "monday",
+              "will"
+            ],
+            "shared_term_count": 45,
+            "score": 16
+          },
+          {
+            "from_id": "3102dbff13d3",
+            "to_id": "69112e4775dc",
+            "from_title": "Dataset:Operation  Hours.pdf (part 2/4)",
+            "to_title": "Dataset:Hospital and Clinic Location.pdf (part 1/2)",
+            "shared_tags": [
+              "medicine",
+              "sport"
+            ],
+            "shared_term_count": 28,
+            "score": 16
+          }
+        ],
+        "knowledge_link_count": 24,
+        "quality_overview": {
+          "avg_quality_score": 96.0,
+          "avg_training_confidence": 75.3,
+          "files_analyzed": 3,
+          "files_with_unclear_parts": 0
+        }
+      },
+      "schema_version": 1,
+      "created_at": 1778234568,
+      "updated_at": 1778237022
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "cases": [
+    {
+      "id": "adtc_location_1",
+      "question": "Where is Healthpoint located?",
+      "expect_keywords": [
+        "location",
+        "abu",
+        "address",
+        "healthpoint"
+      ],
+      "knowledge_mode": "adtc_only"
+    },
+    {
+      "id": "adtc_contact_1",
+      "question": "What are the communication channels?",
+      "expect_keywords": [
+        "phone",
+        "email",
+        "website",
+        "contact"
+      ],
+      "knowledge_mode": "adtc_only"
+    },
+    {
+      "id": "dataset_generic_1",
+      "question": "Summarize what was learned from trained data.",
+      "expect_keywords": [
+        "trained",
+        "data",
+        "summary"
+      ],
+      "knowledge_mode": "all"
+    }
+  ]
+}
