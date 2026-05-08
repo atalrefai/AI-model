@@ -3235,6 +3235,13 @@ INDEX_HTML = """
           <button class="send-btn" id="sendBtn">➤</button>
         </div>
         <div class="hint">Each chat is saved automatically with persistent memory.</div>
+        <div class="credit" style="margin-top:10px;text-align:center;font-size:12px;color:var(--muted);line-height:1.6">
+          <div>👨‍💻 Programmed by Engineer <strong>Abdulrahman Al-Rifai</strong></div>
+          <div>🎓 Master's in Information Technology and Mathematics</div>
+          <div style="margin-top:6px">📬 <strong>Contact:</strong></div>
+          <div>✉️ Email: <a href="mailto:info@aalrifai.com" style="color:var(--accent);text-decoration:none">info@aalrifai.com</a></div>
+          <div>📞 Phone: <a href="tel:+971589125688" style="color:var(--accent);text-decoration:none">+971 58 912 5688</a></div>
+        </div>
         <div style="margin-top:8px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap">
           <button class="btn" id="feedbackUpBtn" style="width:auto;padding:6px 10px">👍 Useful</button>
           <button class="btn" id="feedbackDownBtn" style="width:auto;padding:6px 10px">👎 Needs Improvement</button>
