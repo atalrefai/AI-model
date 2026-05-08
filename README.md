@@ -319,6 +319,44 @@ pip install flask pypdf python-docx openpyxl sqlalchemy psutil
 pip install pytesseract pillow
 ```
 
+#### Download the Phi-3 model weights
+
+The repository does **not** ship the GGUF file (it is ~2 GB and excluded
+via `.gitignore`). Download it from the official Microsoft Hugging Face
+repository and place it in the project root next to `web2.py`:
+
+- Hugging Face page:
+  <https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf>
+- Direct file (Q4, ~2.4 GB):
+  <https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf>
+
+Quick download options:
+
+```powershell
+# Option A — PowerShell (Windows)
+Invoke-WebRequest `
+  -Uri "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf" `
+  -OutFile ".\Phi-3-mini-4k-instruct-q4.gguf"
+
+# Option B — curl (any OS)
+curl -L -o Phi-3-mini-4k-instruct-q4.gguf `
+  "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf"
+
+# Option C — huggingface-cli (recommended for resumable downloads)
+pip install -U "huggingface_hub[cli]"
+huggingface-cli download microsoft/Phi-3-mini-4k-instruct-gguf `
+  Phi-3-mini-4k-instruct-q4.gguf --local-dir . --local-dir-use-symlinks False
+```
+
+The final file path expected by `web2.py` is exactly:
+
+```
+<project root>\Phi-3-mini-4k-instruct-q4.gguf
+```
+
+> License: the Phi-3 weights are governed by the Microsoft Phi-3 license
+> on Hugging Face — please review and accept it before use.
+
 #### Run
 ```powershell
 python .\web2.py
@@ -560,6 +598,44 @@ pip install flask pypdf python-docx openpyxl sqlalchemy psutil
 # اختياري للـ OCR:
 pip install pytesseract pillow
 ```
+
+#### تنزيل أوزان نموذج Phi-3
+
+المستودع **لا** يحتوي ملف الـ GGUF (حجمه ~2 جيجابايت ومستثنى عبر
+`.gitignore`). يجب تنزيله من المستودع الرسمي لشركة Microsoft على
+Hugging Face ووضعه في جذر المشروع بجانب `web2.py`:
+
+- صفحة Hugging Face:
+  <https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf>
+- الرابط المباشر للملف (Q4، ~2.4 جيجابايت):
+  <https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf>
+
+طرق سريعة للتنزيل:
+
+```powershell
+# الخيار أ — PowerShell على ويندوز
+Invoke-WebRequest `
+  -Uri "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf" `
+  -OutFile ".\Phi-3-mini-4k-instruct-q4.gguf"
+
+# الخيار ب — curl (أي نظام)
+curl -L -o Phi-3-mini-4k-instruct-q4.gguf `
+  "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf"
+
+# الخيار ج — huggingface-cli (موصى به لاستئناف التنزيل)
+pip install -U "huggingface_hub[cli]"
+huggingface-cli download microsoft/Phi-3-mini-4k-instruct-gguf `
+  Phi-3-mini-4k-instruct-q4.gguf --local-dir . --local-dir-use-symlinks False
+```
+
+المسار النهائي المتوقع من `web2.py` هو بالضبط:
+
+```
+<جذر المشروع>\Phi-3-mini-4k-instruct-q4.gguf
+```
+
+> الترخيص: أوزان Phi-3 تخضع لرخصة Microsoft Phi-3 على Hugging Face —
+> الرجاء مراجعتها وقبولها قبل الاستخدام.
 
 #### التشغيل
 ```powershell
