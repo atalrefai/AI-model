@@ -3236,7 +3236,7 @@ INDEX_HTML = """
         </div>
         <div class="hint">Each chat is saved automatically with persistent memory.</div>
         <div class="credit" style="margin-top:10px;text-align:center;font-size:12px;color:var(--muted);line-height:1.6">
-          👨‍💻 Programmed by Engineer <strong>Abdulrahman Al-Rifai</strong> · 🎓 Master's in IT &amp; Mathematics · 📬 Contact: ✉️ <a href="mailto:info@aalrifai.com" style="color:var(--accent);text-decoration:none">info@aalrifai.com</a> · 📞 <a href="tel:+971589125688" style="color:var(--accent);text-decoration:none">+971 58 912 5688</a>
+          👨‍💻 Programmed by Engineer <strong>Abdulrahman Al-Rifai</strong> · 🎓 Master's in Software systems &amp; Mathematics · Business Intelligence Data Analyst 📬 Contact: ✉️ <a href="mailto:info@aalrifai.com" style="color:var(--accent);text-decoration:none">info@aalrifai.com</a> · 📞 <a href="tel:+971589125688" style="color:var(--accent);text-decoration:none">+971 58 912 5688</a>
         </div>
         <div style="margin-top:8px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap">
           <button class="btn" id="feedbackUpBtn" style="width:auto;padding:6px 10px">👍 Useful</button>
