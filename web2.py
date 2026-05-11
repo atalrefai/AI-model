@@ -65,6 +65,8 @@ AUDIT_LOG_PATH = TRAINING_STORE_DIR / "audit_log.jsonl"
 FEEDBACK_LOG_PATH = TRAINING_STORE_DIR / "feedback_log.jsonl"
 LEARNING_BACKLOG_PATH = TRAINING_STORE_DIR / "learning_backlog.jsonl"
 EVAL_CASES_PATH = TRAINING_STORE_DIR / "eval_cases.json"
+QA_MEMORY_LOG_PATH = TRAINING_STORE_DIR / "qa_memory_log.jsonl"
+QA_MEMORY_REVIEW_PATH = TRAINING_STORE_DIR / "qa_memory_review.jsonl"
 
 try:
   PdfReader = __import__("pypdf").PdfReader
@@ -98,6 +100,7 @@ RUNTIME_CONFIG = {
     "temperature": 0.7,
     "top_p": 0.95,
     "stop": ["<|end|>", "<|user|>", "<|assistant|>"],
+  "adtc_threads": None,
 }
 
 SCHEMA_VERSION = 1
@@ -107,6 +110,7 @@ _chat_lock = threading.Lock()
 _monitor_lock = threading.Lock()
 _training_lock = threading.Lock()
 _audit_lock = threading.Lock()
+_llm_pool_lock = threading.Lock()
 
 MONITOR_STATE = {
   "current": {
@@ -132,6 +136,7 @@ llm = Llama(
   n_threads=MODEL_THREADS,
     verbose=False,
 )
+_ADTC_LLM_POOL: dict[int, Llama] = {}
 
 
 def _now_ts() -> int:
@@ -436,6 +441,81 @@ def _read_jsonl(path: Path, max_lines: int = 500) -> list[dict]:
       continue
     if isinstance(obj, dict):
       out.append(obj)
+  return out
+
+
+def _append_qa_memory_item(
+  chat_id: str,
+  request_id: str,
+  question: str,
+  answer: str,
+  knowledge_mode: str,
+  response_mode: str,
+  quality: dict | None,
+  confidence: dict | None,
+  sources: list[dict] | None,
+) -> str:
+  entry_id = uuid.uuid4().hex[:14]
+  item = {
+    "id": entry_id,
+    "ts": _now_ts(),
+    "chat_id": str(chat_id or ""),
+    "request_id": str(request_id or ""),
+    "question": str(question or ""),
+    "answer": str(answer or ""),
+    "knowledge_mode": str(knowledge_mode or "all"),
+    "response_mode": str(response_mode or "analytical"),
+    "quality_score": int((quality or {}).get("score") or 0),
+    "confidence_score": int((confidence or {}).get("score") or 0),
+    "sources": sources or [],
+  }
+  _append_jsonl(QA_MEMORY_LOG_PATH, item)
+  return entry_id
+
+
+def _append_qa_memory_review(entry_id: str, action: str, note: str = ""):
+  action = str(action or "").strip().lower()
+  if action not in {"approved", "rejected", "pending"}:
+    raise ValueError("invalid review action")
+  _append_jsonl(
+    QA_MEMORY_REVIEW_PATH,
+    {
+      "ts": _now_ts(),
+      "entry_id": str(entry_id or "").strip(),
+      "action": action,
+      "note": str(note or "").strip(),
+    },
+  )
+
+
+def _qa_memory_with_status(limit: int = 500, status: str = "all") -> list[dict]:
+  items = _read_jsonl(QA_MEMORY_LOG_PATH, max_lines=max(1, limit * 4))
+  reviews = _read_jsonl(QA_MEMORY_REVIEW_PATH, max_lines=max(500, limit * 6))
+
+  latest_review = {}
+  for rv in reviews:
+    eid = str(rv.get("entry_id") or "").strip()
+    if not eid:
+      continue
+    prev = latest_review.get(eid)
+    if not prev or int(rv.get("ts") or 0) >= int(prev.get("ts") or 0):
+      latest_review[eid] = rv
+
+  out = []
+  wanted = str(status or "all").strip().lower()
+  for it in reversed(items):
+    eid = str(it.get("id") or "").strip()
+    rv = latest_review.get(eid)
+    item_status = str((rv or {}).get("action") or "pending")
+    if wanted in {"approved", "rejected", "pending"} and item_status != wanted:
+      continue
+    row = dict(it)
+    row["review_status"] = item_status
+    row["review_note"] = str((rv or {}).get("note") or "")
+    row["review_ts"] = int((rv or {}).get("ts") or 0)
+    out.append(row)
+    if len(out) >= limit:
+      break
   return out
 
 
@@ -1204,6 +1284,171 @@ def _tokenize(text_value: str) -> list[str]:
       continue
     tokens.append(w)
   return tokens
+
+
+def _is_doctor_list_query(query: str) -> bool:
+  q_low = str(query or "").lower()
+  return (
+    any(k in q_low for k in ("doctor", "doctors", "physician", "physicians", "consultant", "dentist", "dental", "list"))
+    or any(k in str(query or "") for k in ("طبيب", "أطباء", "الدكتور", "دكتور", "استشاري", "أسنان", "قائمة"))
+  )
+
+
+def _expand_retrieval_query(query: str) -> str:
+  base = re.sub(r"\s+", " ", str(query or "")).strip()
+  if not base:
+    return ""
+  extras = []
+
+  if _is_doctor_list_query(base):
+    extras.extend([
+      "doctor", "doctors", "dr", "dentist", "dental", "hp", "healthpoint",
+      "appointment", "schedule", "overbooking", "patient",
+      "طبيب", "أطباء", "دكتور", "أسنان",
+    ])
+
+  q_low = base.lower()
+  if any(k in q_low for k in ("location", "address", "where")) or any(k in base for k in ("الموقع", "العنوان", "أين", "اين")):
+    extras.extend(["location", "address", "clinic", "hospital", "where", "الموقع", "العنوان", "عيادة", "مستشفى"])
+
+  if any(k in q_low for k in ("contact", "channel", "phone", "email", "website")) or any(k in base for k in ("التواصل", "الهاتف", "البريد", "الموقع")):
+    extras.extend(["contact", "communication", "channel", "phone", "email", "website", "التواصل", "الهاتف", "البريد"])
+
+  # Add extras only if not already present to preserve query meaning while improving recall.
+  existing = set(_tokenize(base))
+  extra_clean = []
+  for x in extras:
+    tx = _tokenize(x)
+    if not tx:
+      continue
+    if any(t not in existing for t in tx):
+      extra_clean.append(x)
+
+  if not extra_clean:
+    return base
+  return base + " " + " ".join(extra_clean)
+
+
+def _is_noisy_fragment(text_value: str) -> bool:
+  t = re.sub(r"\s+", " ", str(text_value or "")).strip()
+  if not t:
+    return True
+  if len(t) < 5:
+    return True
+  alpha = len(re.findall(r"[A-Za-z\u0600-\u06FF]", t))
+  digits = len(re.findall(r"\d", t))
+  punct = len(re.findall(r"[^\w\s\u0600-\u06FF]", t))
+  total = max(1, len(t))
+  alpha_ratio = alpha / total
+  digit_ratio = digits / total
+  punct_ratio = punct / total
+  # Strong indicators of OCR/PDF artifact garbage.
+  if alpha_ratio < 0.25 and (digit_ratio + punct_ratio) > 0.45:
+    return True
+  if re.search(r"([:\-_/\.])\1{2,}", t):
+    return True
+  if re.search(r"\b(?:\d{1,3}:){2,}\d{0,3}\b", t):
+    return True
+  if re.search(r"\b(?:0{4,}|1{4,}|2{4,}|3{4,})\b", t):
+    return True
+  return False
+
+
+def _clean_adtc_reply_text(text_value: str) -> str:
+  lines_in = [re.sub(r"\s+", " ", ln).strip() for ln in str(text_value or "").splitlines()]
+  kept = []
+  seen = set()
+  for ln in lines_in:
+    if not ln:
+      continue
+    ll = ln.lower()
+    if _is_noisy_fragment(ln):
+      continue
+    if ll in seen:
+      continue
+    seen.add(ll)
+    # Remove common PDF/site artifacts.
+    if any(k in ll for k in (
+      "powered by", "media, iframe", "embed and object", "executive summary",
+      "updated:", "page ", "copyright",
+    )):
+      continue
+    kept.append(ln)
+
+  # Keep answer concise and clean; avoid very long noisy tails.
+  if len(kept) > 28:
+    kept = kept[:28]
+
+  out = "\n".join(kept).strip()
+  return out
+
+
+def _looks_garbled_reply(text_value: str) -> bool:
+  txt = str(text_value or "").strip()
+  if not txt:
+    return True
+  lines = [ln.strip() for ln in txt.splitlines() if ln.strip()]
+  if not lines:
+    return True
+  noisy = sum(1 for ln in lines if _is_noisy_fragment(ln))
+  if noisy >= max(3, int(len(lines) * 0.35)):
+    return True
+  if re.search(r"\n\s*(?:\d+\.|:|\-|of:|than)\s*\n", txt, flags=re.IGNORECASE):
+    return True
+  return False
+
+
+def _extract_adtc_doctor_entries(docs: list[dict], max_items: int = 30) -> list[dict]:
+  name_pattern = re.compile(r"\bDr\.?\s+[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,4}\b")
+  rows = []
+  for d in docs or []:
+    if str(d.get("source", "")).strip().lower() != "adtc":
+      continue
+    for raw in str(d.get("content", "")).splitlines():
+      line = re.sub(r"\s+", " ", raw).strip(" -•\t")
+      if len(line) < 5:
+        continue
+      if _is_noisy_fragment(line):
+        continue
+      if not re.search(r"\bdr\.?\b", line, flags=re.IGNORECASE):
+        continue
+      for m in name_pattern.finditer(line):
+        name = re.sub(r"\s+", " ", m.group(0).strip())
+        # Trim accidental trailing tokens from OCR like "Not", "All".
+        name = re.sub(r"\s+(Not|All|And)$", "", name, flags=re.IGNORECASE)
+        if len(name.split()) < 2:
+          continue
+
+        # Build a compact policy note from the same line.
+        ll = line.lower()
+        note_parts = []
+        m_limit = re.search(r"(?:not\s+more\s+than|up\s*to|max(?:imum)?(?:\s*of)?|<=?)\s*([0-9]{1,3})", ll)
+        if m_limit:
+          note_parts.append(f"Max patients/day: {m_limit.group(1)}")
+        if re.search(r"\b(overbook|overbooking|approval)\b", ll):
+          note_parts.append("Overbooking policy mentioned")
+        if re.search(r"\b(orthodont|specialist|general practitioner|gp)\b", ll):
+          if "orthodont" in ll:
+            note_parts.append("Department: Orthodontics")
+          elif "specialist" in ll:
+            note_parts.append("Role: Specialist")
+          elif "general practitioner" in ll or re.search(r"\bgp\b", ll):
+            note_parts.append("Role: General Practitioner")
+
+        note = "; ".join(note_parts) if note_parts else "Mentioned in trained ADTC scheduling data"
+        rows.append({"name": name, "note": note})
+
+  dedup = []
+  seen = set()
+  for r in rows:
+    key = r["name"].lower()
+    if key in seen:
+      continue
+    seen.add(key)
+    dedup.append(r)
+    if len(dedup) >= max_items:
+      break
+  return dedup
 
 
 def _doc_semantic_token_set(doc: dict) -> set[str]:
@@ -2148,7 +2393,7 @@ def _run_training_job(link_id: str):
       "how_it_is_used": (
         "Each chat turn the assistant retrieves the most relevant of these "
         "rich documents (per-table profiles plus the global summary) and grounds "
-        "its answer on them. The base Phi-3 model file is NOT modified; the "
+        "its answer on them. The base AR model file is NOT modified; the "
         "knowledge memory is what grows and gets richer with every training run."
       ),
       "what_it_understood": (
@@ -2165,7 +2410,7 @@ def _run_training_job(link_id: str):
 
     _job_update(job, status="completed", stage="done", finished_at=time.time(), percent=100, eta_ms=0)
     _job_log(job, f"Training completed. Tables: {len(table_names)}, Docs added: {added_docs}, Rows sampled: {rows_total}")
-    _job_log(job, "Note: knowledge was added to the assistant's retrieval memory (RAG). The Phi-3 model weights were NOT modified.")
+    _job_log(job, "Note: knowledge was added to the assistant's retrieval memory (RAG). The AR model weights were NOT modified.")
   except Exception as exc:
     err = str(exc)
     is_stop = err.startswith("Training stopped by user")
@@ -2340,6 +2585,22 @@ def _answer_from_knowledge(query: str, docs: list[dict]) -> str | None:
     or any(k in query for k in ("قنوات التواصل", "وسائل التواصل", "طرق التواصل", "التواصل", "البريد", "الهاتف", "الموقع"))
   )
   adtc_docs = [d for d in docs if str(d.get("source", "")).lower() == "adtc"]
+
+  asks_doctors = _is_doctor_list_query(query)
+  if asks_doctors and adtc_docs:
+    doctors = _extract_adtc_doctor_entries(adtc_docs)
+    if doctors:
+      if is_ar:
+        parts = ["استنادًا إلى بيانات ADTC المدربة، هذه قائمة الأطباء المذكورين:"]
+        for d in doctors:
+          parts.append(f"- {d['name']}: {d['note']}")
+        parts.append("ملاحظة: تم عرض الأسماء كما وردت في البيانات المدربة، وتم حذف أي نص مشوّه أو غير مقروء.")
+        return head + "\n".join(parts)
+      parts = ["The following doctors are explicitly mentioned:"]
+      for d in doctors:
+        parts.append(f"- {d['name']}: {d['note']}")
+      parts.append("Note: noisy OCR/PDF artifacts were filtered out for readability.")
+      return head + "\n".join(parts)
 
   # ADTC-specific synthesis for closure/holiday schedule questions.
   asks_closure = (
@@ -2595,6 +2856,43 @@ def _estimate_tokens(text: str) -> int:
   return max(1, len(text) // 4)
 
 
+def _effective_adtc_threads() -> int | None:
+  with _config_lock:
+    raw = RUNTIME_CONFIG.get("adtc_threads")
+  if raw in (None, "", 0, "0"):
+    return None
+  try:
+    n = int(raw)
+  except Exception:
+    return None
+  max_allowed = max(1, os.cpu_count() or MODEL_THREADS)
+  if n < 1:
+    return None
+  return min(max_allowed, n)
+
+
+def _llm_for_adtc_threads(threads: int | None) -> Llama:
+  """Return a Llama instance for ADTC generation with a dedicated thread count.
+
+  - None or default thread count -> use the main global model instance.
+  - Any other valid value -> lazily build/cached model instance for ADTC-only requests.
+  """
+  if threads in (None, MODEL_THREADS):
+    return llm
+  t = int(threads)
+  with _llm_pool_lock:
+    if t in _ADTC_LLM_POOL:
+      return _ADTC_LLM_POOL[t]
+    inst = Llama(
+      model_path=MODEL_PATH,
+      n_ctx=MODEL_CTX,
+      n_threads=t,
+      verbose=False,
+    )
+    _ADTC_LLM_POOL[t] = inst
+    return inst
+
+
 def _looks_like_refusal(text_value: str) -> bool:
   low = (text_value or "").strip().lower()
   if not low:
@@ -2631,6 +2929,8 @@ def _extract_evidence_lines(query: str, docs: list[dict], max_items: int = 8) ->
     for raw in str(d.get("content", "")).splitlines():
       line = re.sub(r"\s+", " ", raw).strip(" -•\t")
       if len(line) < 8:
+        continue
+      if _is_noisy_fragment(line):
         continue
       l_tokens = set(_tokenize(line))
       overlap = len(q_tokens.intersection(l_tokens))
@@ -2861,6 +3161,7 @@ def _monitor_snapshot() -> dict:
       "path": MODEL_PATH,
       "ctx": MODEL_CTX,
       "threads": MODEL_THREADS,
+      "adtc_threads": _effective_adtc_threads(),
     },
     "current": {
       **current,
@@ -2886,7 +3187,7 @@ INDEX_HTML = """
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Phi-3 Mini Chat</title>
+  <title>AR Chat</title>
   <style>
     :root {
       --bg: #1f1f1f;
@@ -3110,6 +3411,65 @@ INDEX_HTML = """
       text-align: center;
     }
 
+    .hint-row {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      position: relative;
+    }
+
+    .info-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .info-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: #ffffff;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 22px;
+      text-align: center;
+      padding: 0;
+      box-shadow: 0 0 0 2px rgba(16,163,127,.25);
+    }
+
+    .info-icon:hover {
+      filter: brightness(1.08);
+    }
+
+    .info-popover {
+      display: none;
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(520px, 92vw);
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.6;
+      box-shadow: 0 10px 26px rgba(0,0,0,.28);
+      z-index: 15;
+      text-align: left;
+    }
+
+    .info-wrap:hover .info-popover,
+    .info-wrap.open .info-popover {
+      display: block;
+    }
+
     .menu {
       position: absolute;
       right: 16px;
@@ -3205,7 +3565,7 @@ INDEX_HTML = """
 
     <main class="main">
       <header class="topbar">
-        <div>Phi-3 Mini  |  Local Assistant</div>
+        <div>AR  |  Local Assistant</div>
         <div class="top-actions">
           <select id="knowledgeModeSelect" title="Knowledge mode" style="height:32px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);padding:0 8px;">
             <option value="all">All Knowledge</option>
@@ -3217,6 +3577,7 @@ INDEX_HTML = """
           </select>
           <button class="icon-btn" id="monitorBtn" title="Monitoring">📊</button>
           <button class="icon-btn" id="trainingBtn" title="Training">🧠</button>
+          <button class="icon-btn" id="qaMemoryBtn" title="Q/A Memory for ADTC">🗂</button>
           <button class="icon-btn" id="themeBtn" title="Toggle theme">◐</button>
           <button class="icon-btn" id="settingsBtn" title="Settings and API docs">&#9881;</button>
         </div>
@@ -3231,12 +3592,19 @@ INDEX_HTML = """
 
       <div class="composer-wrap">
         <div class="composer">
-          <textarea id="messageInput" placeholder="Message Phi-3 Mini... (Enter to send, Shift+Enter for new line)"></textarea>
+          <textarea id="messageInput" placeholder="Write your Message... (Enter to send, Shift+Enter for new line)"></textarea>
           <button class="send-btn" id="sendBtn">➤</button>
         </div>
-        <div class="hint">Each chat is saved automatically with persistent memory.</div>
-        <div class="credit" style="margin-top:10px;text-align:center;font-size:12px;color:var(--muted);line-height:1.6">
-          👨‍💻 Programmed by Engineer <strong>Abdulrahman Al-Rifai</strong> · 🎓 Master's in Software systems &amp; Mathematics · Business Intelligence Data Analyst 📬 Contact: ✉️ <a href="mailto:info@aalrifai.com" style="color:var(--accent);text-decoration:none">info@aalrifai.com</a> · 📞 <a href="tel:+971589125688" style="color:var(--accent);text-decoration:none">+971 58 912 5688</a>
+        <div class="hint-row">
+          <div class="hint">Each chat is saved automatically with persistent memory.</div>
+          <div class="info-wrap" id="engineerInfoWrap">
+            <button class="info-icon" id="engineerInfoBtn" title="Show engineer info" aria-label="Show engineer info">i</button>
+            <div class="info-popover" id="engineerInfoPopover">
+              👨‍💻 Programmed by Engineer Abdulrahman Al-Rifai · 🎓 Master's in Software systems &amp; Mathematics · Business Intelligence Data Analyst<br/>
+              📬 Contact: ✉️ <a href="mailto:info@aalrifai.com" style="color:var(--accent);text-decoration:none">info@aalrifai.com</a> · ✉️ <a href="mailto:mr-alrefai@hotmail.com" style="color:var(--accent);text-decoration:none">mr-alrefai@hotmail.com</a> · 📞 <a href="tel:+971589125688" style="color:var(--accent);text-decoration:none">+971 58 912 5688</a><br/>
+              🌐 Website: <a href="https://arifai.com" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">https://arifai.com</a>
+            </div>
+          </div>
         </div>
         <div style="margin-top:8px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap">
           <button class="btn" id="feedbackUpBtn" style="width:auto;padding:6px 10px">👍 Useful</button>
@@ -3267,6 +3635,10 @@ INDEX_HTML = """
         <div>
           <label for="stopInput">stop tokens (JSON array)</label>
           <input type="text" id="stopInput" />
+        </div>
+        <div>
+          <label for="adtcThreadsInput">ADTC threads (ADTC only)</label>
+          <input type="number" id="adtcThreadsInput" min="1" placeholder="Leave empty to use default model threads" />
         </div>
       </div>
       <div class="modal-actions">
@@ -3314,16 +3686,20 @@ INDEX_HTML = """
       temperatureInput: document.getElementById('temperatureInput'),
       topPInput: document.getElementById('topPInput'),
       stopInput: document.getElementById('stopInput'),
+      adtcThreadsInput: document.getElementById('adtcThreadsInput'),
       cancelConfigBtn: document.getElementById('cancelConfigBtn'),
       saveConfigBtn: document.getElementById('saveConfigBtn'),
       monitorBtn: document.getElementById('monitorBtn'),
       trainingBtn: document.getElementById('trainingBtn'),
+      qaMemoryBtn: document.getElementById('qaMemoryBtn'),
       themeBtn: document.getElementById('themeBtn'),
       knowledgeModeSelect: document.getElementById('knowledgeModeSelect'),
       responseModeSelect: document.getElementById('responseModeSelect'),
       feedbackUpBtn: document.getElementById('feedbackUpBtn'),
       feedbackDownBtn: document.getElementById('feedbackDownBtn'),
       feedbackStatus: document.getElementById('feedbackStatus'),
+      engineerInfoWrap: document.getElementById('engineerInfoWrap'),
+      engineerInfoBtn: document.getElementById('engineerInfoBtn'),
     };
 
     async function api(url, options) {
@@ -3365,6 +3741,25 @@ INDEX_HTML = """
         row.appendChild(del);
         els.chatList.appendChild(row);
       }
+    }
+
+    function initEngineerInfoPopover() {
+      if (!els.engineerInfoWrap || !els.engineerInfoBtn) return;
+      els.engineerInfoBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        els.engineerInfoWrap.classList.toggle('open');
+      };
+      document.addEventListener('click', (e) => {
+        if (!els.engineerInfoWrap) return;
+        if (els.engineerInfoWrap.contains(e.target)) return;
+        els.engineerInfoWrap.classList.remove('open');
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && els.engineerInfoWrap) {
+          els.engineerInfoWrap.classList.remove('open');
+        }
+      });
     }
 
     function renderMessages() {
@@ -3540,6 +3935,7 @@ INDEX_HTML = """
       els.temperatureInput.value = data.temperature;
       els.topPInput.value = data.top_p;
       els.stopInput.value = JSON.stringify(data.stop);
+      els.adtcThreadsInput.value = (data.adtc_threads === null || data.adtc_threads === undefined) ? '' : data.adtc_threads;
     }
 
     async function saveConfig() {
@@ -3557,6 +3953,7 @@ INDEX_HTML = """
         temperature: Number(els.temperatureInput.value),
         top_p: Number(els.topPInput.value),
         stop,
+        adtc_threads: els.adtcThreadsInput.value.trim() === '' ? null : Number(els.adtcThreadsInput.value),
       };
 
       await api('/api/config', {
@@ -3611,6 +4008,7 @@ INDEX_HTML = """
     if (els.saveConfigBtn) els.saveConfigBtn.onclick = saveConfig;
     if (els.monitorBtn) els.monitorBtn.onclick = () => { window.location.href = withBase('/monitoring'); };
     if (els.trainingBtn) els.trainingBtn.onclick = () => { window.location.href = withBase('/training'); };
+    if (els.qaMemoryBtn) els.qaMemoryBtn.onclick = () => { window.location.href = withBase('/qa-memory'); };
     if (els.themeBtn) els.themeBtn.onclick = toggleTheme;
     if (els.feedbackUpBtn) els.feedbackUpBtn.onclick = () => submitFeedback(5);
     if (els.feedbackDownBtn) els.feedbackDownBtn.onclick = () => submitFeedback(2);
@@ -3632,6 +4030,7 @@ INDEX_HTML = """
     }
 
     (async function bootstrap() {
+      initEngineerInfoPopover();
       initTheme();
       try {
         // Health check: if backend is unreachable, show a clear message instead of a silent dead UI.
@@ -3668,7 +4067,9 @@ def model_reply(
   force_synthesis: bool = False,
   reasoning_bundle: dict | None = None,
   response_mode: str = "analytical",
+  llm_instance: Llama | None = None,
 ) -> tuple[str, dict]:
+    llm_ref = llm_instance or llm
     time_ctx = _live_time_context()
     time_context_block = (
         "LIVE TIME CONTEXT (from server clock):\n"
@@ -3801,7 +4202,7 @@ def model_reply(
     with _config_lock:
         cfg = deepcopy(RUNTIME_CONFIG)
 
-    result = llm.create_chat_completion(
+    result = llm_ref.create_chat_completion(
         messages=messages,
         max_tokens=cfg["max_tokens"],
         temperature=cfg["temperature"],
@@ -3851,10 +4252,34 @@ def model_reply(
         is_ar = any("\u0600" <= ch <= "\u06FF" for ch in (message or ""))
         reply = _append_reasoning_evidence(reply, reasoning_bundle, is_ar=is_ar)
 
+      if "adtc" in srcs:
+        cleaned = _clean_adtc_reply_text(reply)
+        if cleaned:
+          reply = cleaned
+        if _looks_garbled_reply(reply):
+          synth = _synthesize_from_snippets(
+            message,
+            knowledge_docs or [],
+            response_mode=response_mode,
+            llm_instance=llm_ref,
+          )
+          if synth:
+            reply = _clean_adtc_reply_text(synth) or synth
+          if _looks_garbled_reply(reply):
+            grounded = _answer_from_knowledge(message, knowledge_docs or [])
+            if grounded:
+              reply = _clean_adtc_reply_text(grounded) or grounded
+
     return reply, usage
 
 
-def _synthesize_from_snippets(message: str, knowledge_docs: list[dict], response_mode: str = "analytical") -> str:
+def _synthesize_from_snippets(
+  message: str,
+  knowledge_docs: list[dict],
+  response_mode: str = "analytical",
+  llm_instance: Llama | None = None,
+) -> str:
+  llm_ref = llm_instance or llm
   """Force a clean, synthesized answer from the given snippets.
 
   Used as a recovery path when the main model_reply hedges or when the question
@@ -3919,7 +4344,7 @@ def _synthesize_from_snippets(message: str, knowledge_docs: list[dict], response
     cfg = deepcopy(RUNTIME_CONFIG)
 
   try:
-    result = llm.create_chat_completion(
+    result = llm_ref.create_chat_completion(
       messages=[
         {"role": "system", "content": system},
         {"role": "user", "content": user_block},
@@ -3937,7 +4362,7 @@ def _synthesize_from_snippets(message: str, knowledge_docs: list[dict], response
     return ""
   if not out.lower().startswith("from trained adtc data"):
     out = "From trained ADTC data:\n" + out
-  return out
+  return _clean_adtc_reply_text(out) or out
 
 
 @app.get("/")
@@ -3953,7 +4378,7 @@ def monitoring_page():
     <head>
       <meta charset=\"utf-8\" />
       <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
-      <title>Phi-3 Monitoring</title>
+      <title>AR Monitoring</title>
       <style>
         :root { --bg:#111827; --panel:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --accent:#10b981; --line:#374151; --warn:#ef4444; }
         body{margin:0;background:var(--bg);color:var(--text);font-family:Segoe UI,system-ui,sans-serif}
@@ -4075,11 +4500,31 @@ def monitoring_page():
           c.fillStyle = '#111827'; c.fillRect(0, 0, w, h);
           c.strokeStyle = '#374151'; c.lineWidth = 1;
           for (let i = 0; i < 5; i++) { const y = 20 + i * ((h - 40) / 4); c.beginPath(); c.moveTo(30, y); c.lineTo(w - 10, y); c.stroke(); }
-          if (!points.length) return;
-          const maxV = fixedMax || Math.max(1, ...points);
+          const safe = (points || [])
+            .map(v => Number(v))
+            .filter(v => Number.isFinite(v) && v >= 0);
+          if (!safe.length) {
+            c.fillStyle = '#9ca3af';
+            c.font = '12px Segoe UI';
+            c.fillText('No data yet', 36, h / 2);
+            return;
+          }
+          const maxV = fixedMax || Math.max(1, ...safe);
+
+          // With a single point, draw a visible marker instead of an empty line.
+          if (safe.length === 1) {
+            const x = 30 + ((w - 50) / 2);
+            const y = (h - 20) - ((safe[0] / maxV) * (h - 40));
+            c.fillStyle = color;
+            c.beginPath();
+            c.arc(x, y, 4, 0, Math.PI * 2);
+            c.fill();
+            return;
+          }
+
           c.strokeStyle = color; c.lineWidth = 2; c.beginPath();
-          points.forEach((v, i) => {
-            const x = 30 + (i * (w - 50) / Math.max(1, points.length - 1));
+          safe.forEach((v, i) => {
+            const x = 30 + (i * (w - 50) / Math.max(1, safe.length - 1));
             const y = (h - 20) - ((v / maxV) * (h - 40));
             if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
           });
@@ -4092,10 +4537,12 @@ def monitoring_page():
           const c = canvas.getContext('2d');
           const w = canvas.width, h = canvas.height;
           if (!p2.length) return;
-          const maxV = fixedMax || Math.max(1, ...p1, ...p2);
+          const safe1 = (p1 || []).map(v => Number(v)).filter(v => Number.isFinite(v) && v >= 0);
+          const safe2 = (p2 || []).map(v => Number(v)).filter(v => Number.isFinite(v) && v >= 0);
+          const maxV = fixedMax || Math.max(1, ...safe1, ...safe2);
           c.strokeStyle = c2; c.lineWidth = 2; c.beginPath();
-          p2.forEach((v, i) => {
-            const x = 30 + (i * (w - 50) / Math.max(1, p2.length - 1));
+          safe2.forEach((v, i) => {
+            const x = 30 + (i * (w - 50) / Math.max(1, safe2.length - 1));
             const y = (h - 20) - ((v / maxV) * (h - 40));
             if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
           });
@@ -4164,8 +4611,16 @@ def monitoring_page():
               ? ('Processing: ' + cur.stage + ' | elapsed ' + cur.elapsed_ms + ' ms | chat ' + (cur.chat_id || '-'))
               : 'Idle';
 
-            const lat = data.recent.slice(0, 40).map(x => x.total_ms).reverse();
-            const tps = data.recent.slice(0, 40).map(x => x.tokens_per_sec).reverse();
+            const lat = data.recent
+              .slice(0, 40)
+              .map(x => Number(x.total_ms || 0))
+              .filter(v => Number.isFinite(v) && v >= 0)
+              .reverse();
+            const tps = data.recent
+              .slice(0, 40)
+              .map(x => Number(x.tokens_per_sec || 0))
+              .filter(v => Number.isFinite(v) && v >= 0)
+              .reverse();
             drawLine(els.latency, lat, '#60a5fa');
             drawLine(els.tps, tps, '#10b981');
             renderRows(data.recent);
@@ -4181,6 +4636,270 @@ def monitoring_page():
     </html>
     """
     return html
+
+
+@app.get("/qa-memory")
+def qa_memory_page():
+    html = """
+    <!doctype html>
+    <html lang=\"en\">
+    <head>
+      <meta charset=\"utf-8\" />
+      <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+      <title>Q/A Memory for ADTC</title>
+      <style>
+        :root { --bg:#0f172a; --panel:#1e293b; --line:#334155; --text:#e2e8f0; --muted:#94a3b8; --accent:#10b981; --danger:#ef4444; }
+        body{margin:0;background:var(--bg);color:var(--text);font-family:Segoe UI,system-ui,sans-serif}
+        .wrap{max-width:1200px;margin:0 auto;padding:16px}
+        .head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+        .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+        .k{font-size:12px;color:var(--muted)}
+        .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+        input,select,button{border:1px solid var(--line);background:#0b1220;color:var(--text);border-radius:10px;padding:8px 10px;font-size:13px}
+        button.primary{background:var(--accent);border-color:var(--accent);color:#062012;font-weight:700}
+        button.danger{background:#3b0d0d;border-color:#7f1d1d;color:#fecaca}
+        table{width:100%;border-collapse:collapse}
+        th,td{padding:8px;border-bottom:1px solid var(--line);font-size:12px;text-align:left;vertical-align:top}
+        th{color:var(--muted)}
+        .pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid var(--line);font-size:11px}
+        .s-approved{background:#064e3b;color:#a7f3d0;border-color:#064e3b}
+        .s-rejected{background:#7f1d1d;color:#fecaca;border-color:#7f1d1d}
+        .s-pending{background:#1e3a8a;color:#dbeafe;border-color:#1e3a8a}
+      </style>
+    </head>
+    <body>
+      <div class=\"wrap\">
+        <div class=\"head\">
+          <div>
+            <h2 style=\"margin:0\">Q/A Memory For ADTC Training</h2>
+            <div class=\"k\">This page stores all generated Q/A turns and lets you curate them before ADTC training.</div>
+          </div>
+          <div class=\"row\">
+            <button onclick=\"window.location.href='/'\">← Chat</button>
+            <button onclick=\"window.location.href='/training'\">Training Center</button>
+          </div>
+        </div>
+
+        <div class=\"card\">
+          <div class=\"row\">
+            <label>Status</label>
+            <select id=\"statusFilter\">
+              <option value=\"all\">All</option>
+              <option value=\"pending\">Pending</option>
+              <option value=\"approved\">Approved</option>
+              <option value=\"rejected\">Rejected</option>
+            </select>
+            <label>Limit</label>
+            <input id=\"limitInput\" type=\"number\" min=\"10\" max=\"1000\" value=\"200\" style=\"width:100px\" />
+            <button id=\"refreshBtn\">Refresh</button>
+            <span class=\"k\" id=\"counts\"></span>
+          </div>
+        </div>
+
+        <div class=\"card\">
+          <h3 style=\"margin-top:0\">Export Approved Items To ADTC Dataset</h3>
+          <div class=\"row\">
+            <input id=\"dsName\" placeholder=\"Dataset name (required)\" style=\"min-width:300px\" />
+            <input id=\"dsTopic\" placeholder=\"Topic (optional)\" style=\"min-width:220px\" />
+            <input id=\"maxItems\" type=\"number\" min=\"10\" max=\"5000\" value=\"500\" style=\"width:110px\" />
+            <button class=\"primary\" id=\"exportBtn\">Create ADTC Dataset</button>
+            <span class=\"k\" id=\"exportMsg\"></span>
+          </div>
+        </div>
+
+        <div class=\"card\">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th><th>Status</th><th>Question</th><th>Answer</th><th>Mode</th><th>Scores</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id=\"rows\"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <script>
+        function fmtTime(ts){ if(!ts) return '-'; try{return new Date(ts*1000).toLocaleString();}catch(e){return String(ts);} }
+        function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+        function statusPill(s){
+          const cls = s==='approved' ? 's-approved' : (s==='rejected' ? 's-rejected' : 's-pending');
+          return '<span class=\"pill '+cls+'\">'+esc(s||'pending')+'</span>';
+        }
+
+        async function api(url, options){
+          const res = await fetch(url, options || {});
+          const txt = await res.text();
+          let data = {};
+          try { data = txt ? JSON.parse(txt) : {}; } catch(e) { data = {raw: txt}; }
+          if(!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+          return data;
+        }
+
+        async function loadRows(){
+          const status = document.getElementById('statusFilter').value || 'all';
+          const limit = Number(document.getElementById('limitInput').value || 200);
+          const data = await api('/api/qa-memory?status=' + encodeURIComponent(status) + '&limit=' + encodeURIComponent(limit));
+          const items = data.items || [];
+          document.getElementById('counts').textContent = 'items: ' + items.length + ' | approved: ' + (data.counts||{}).approved + ' | pending: ' + (data.counts||{}).pending + ' | rejected: ' + (data.counts||{}).rejected;
+          const rows = document.getElementById('rows');
+          rows.innerHTML = '';
+          for(const it of items){
+            const tr = document.createElement('tr');
+            tr.innerHTML =
+              '<td>' + fmtTime(it.ts) + '</td>' +
+              '<td>' + statusPill(it.review_status) + '</td>' +
+              '<td>' + esc((it.question||'').slice(0, 220)) + '</td>' +
+              '<td>' + esc((it.answer||'').slice(0, 280)) + '</td>' +
+              '<td>' + esc((it.knowledge_mode||'-') + ' / ' + (it.response_mode||'-')) + '</td>' +
+              '<td>Q:' + Number(it.quality_score||0) + ' C:' + Number(it.confidence_score||0) + '</td>' +
+              '<td>' +
+                '<button onclick=\"reviewItem(\\'' + esc(it.id) + '\\',\\'approved\\')\">Approve</button> ' +
+                '<button class=\"danger\" onclick=\"reviewItem(\\'' + esc(it.id) + '\\',\\'rejected\\')\">Reject</button> ' +
+                '<button onclick=\"reviewItem(\\'' + esc(it.id) + '\\',\\'pending\\')\">Reset</button>' +
+              '</td>';
+            rows.appendChild(tr);
+          }
+        }
+
+        async function reviewItem(id, action){
+          await api('/api/qa-memory/review', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({entry_id:id, action:action})
+          });
+          await loadRows();
+        }
+        window.reviewItem = reviewItem;
+
+        document.getElementById('refreshBtn').onclick = loadRows;
+
+        document.getElementById('exportBtn').onclick = async () => {
+          const name = document.getElementById('dsName').value.trim();
+          const topic = document.getElementById('dsTopic').value.trim();
+          const maxItems = Number(document.getElementById('maxItems').value || 500);
+          const msg = document.getElementById('exportMsg');
+          if(!name){ msg.textContent = 'Dataset name is required.'; return; }
+          msg.textContent = 'Exporting...';
+          try {
+            const data = await api('/api/qa-memory/export-adtc', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({name, topic, max_items: maxItems})
+            });
+            msg.textContent = 'Created ADTC dataset: ' + ((data.dataset||{}).name || name) + ' with ' + (data.items_exported||0) + ' items.';
+          } catch(e){
+            msg.textContent = 'Error: ' + e.message;
+          }
+        };
+
+        loadRows();
+      </script>
+    </body>
+    </html>
+    """
+    return html
+
+
+@app.get("/api/qa-memory")
+def qa_memory_list_api():
+    try:
+      limit = int(request.args.get("limit") or 200)
+    except Exception:
+      limit = 200
+    limit = max(10, min(1000, limit))
+    status = str(request.args.get("status") or "all").strip().lower()
+    if status not in {"all", "pending", "approved", "rejected"}:
+      status = "all"
+    items = _qa_memory_with_status(limit=limit, status=status)
+    counts = {
+      "approved": sum(1 for x in items if str(x.get("review_status") or "pending") == "approved"),
+      "pending": sum(1 for x in items if str(x.get("review_status") or "pending") == "pending"),
+      "rejected": sum(1 for x in items if str(x.get("review_status") or "pending") == "rejected"),
+    }
+    return jsonify({"items": items, "counts": counts, "status": status, "limit": limit})
+
+
+@app.post("/api/qa-memory/review")
+def qa_memory_review_api():
+    data = request.get_json(silent=True) or {}
+    entry_id = str(data.get("entry_id") or "").strip()
+    action = str(data.get("action") or "").strip().lower()
+    note = str(data.get("note") or "").strip()
+    if not entry_id:
+      return jsonify({"error": "entry_id is required"}), 400
+    try:
+      _append_qa_memory_review(entry_id, action, note=note)
+    except Exception as exc:
+      return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, "entry_id": entry_id, "action": action})
+
+
+@app.post("/api/qa-memory/export-adtc")
+def qa_memory_export_adtc_api():
+  data = request.get_json(silent=True) or {}
+  base_name = str(data.get("name") or "").strip()
+  topic = str(data.get("topic") or "").strip() or "qa-memory"
+  try:
+    max_items = int(data.get("max_items") or 500)
+  except Exception:
+    max_items = 500
+  max_items = max(10, min(5000, max_items))
+  if not base_name:
+    return jsonify({"error": "name is required"}), 400
+
+  # Enforce automatic timestamp suffix: <user_name>_YYYY-MM-DD_HH-MM-SS
+  safe_base = re.sub(r"\s+", "_", base_name)
+  safe_base = re.sub(r"[^A-Za-z0-9_\-]", "_", safe_base).strip("_") or "qa_memory"
+  name = f"{safe_base}_{datetime.now().astimezone().strftime('%Y-%m-%d_%H-%M-%S')}"
+
+  approved = _qa_memory_with_status(limit=max_items * 2, status="approved")
+  approved = approved[:max_items]
+  if not approved:
+    return jsonify({"error": "No approved Q/A items to export"}), 400
+
+  dataset_id = _new_adtc_id()
+  ds_dir = ADTC_FILES_DIR / dataset_id
+  ds_dir.mkdir(parents=True, exist_ok=True)
+
+  export_name = "qa_memory_export.jsonl"
+  export_path = ds_dir / export_name
+  lines = []
+  for it in approved:
+    lines.append(__import__("json").dumps({
+      "id": it.get("id"),
+      "question": it.get("question"),
+      "answer": it.get("answer"),
+      "knowledge_mode": it.get("knowledge_mode"),
+      "response_mode": it.get("response_mode"),
+      "quality_score": it.get("quality_score"),
+      "confidence_score": it.get("confidence_score"),
+      "ts": it.get("ts"),
+    }, ensure_ascii=True))
+  export_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+  ds = _normalize_adtc_dataset({
+    "id": dataset_id,
+    "name": name,
+    "topic": topic,
+    "files": [{
+      "name": export_name,
+      "original_name": export_name,
+      "ext": ".jsonl",
+      "kind": "jsonl",
+      "size_bytes": export_path.stat().st_size,
+    }],
+    "status": "saved",
+    "saved_at": _now_ts(),
+    "last_error": None,
+  })
+  _persist_adtc_dataset(ds)
+
+  return jsonify({
+    "ok": True,
+    "dataset": _public_adtc_dataset(ds),
+    "items_exported": len(approved),
+  })
 
 
 @app.get("/training")
@@ -4210,6 +4929,44 @@ def training_adtc_run_page(dataset_id: str):
   if not ds:
     return "<h2>ADTC dataset not found</h2>", 404
   return render_template_string(ADTC_RUN_HTML, dataset_id=dataset_id, dataset_name=ds.get("name", ""))
+
+
+@app.get("/training/adtc/metrics/<dataset_id>")
+def training_adtc_metrics_page(dataset_id: str):
+  ds = _find_adtc_dataset(dataset_id)
+  if not ds:
+    return "<h2>ADTC dataset not found</h2>", 404
+  meta = ds.get("meta") if isinstance(ds.get("meta"), dict) else {}
+  metric_contracts = meta.get("metric_contracts") if isinstance(meta.get("metric_contracts"), list) else []
+  safe_contracts = []
+  for i, item in enumerate(metric_contracts, start=1):
+    if not isinstance(item, dict):
+      continue
+    src_tables = item.get("source_tables")
+    if isinstance(src_tables, str):
+      src_tables = [x.strip() for x in src_tables.split(",") if x and x.strip()]
+    elif isinstance(src_tables, list):
+      src_tables = [str(x).strip() for x in src_tables if str(x).strip()]
+    else:
+      src_tables = []
+    safe_contracts.append({
+      "idx": i,
+      "name": str(item.get("name") or "").strip(),
+      "formula": str(item.get("formula") or "").strip(),
+      "source_tables": src_tables,
+      "grain": str(item.get("grain") or "").strip(),
+      "unit": str(item.get("unit") or "").strip(),
+      "description": str(item.get("description") or "").strip(),
+    })
+
+  return render_template_string(
+    ADTC_METRICS_HTML,
+    dataset_id=dataset_id,
+    dataset_name=ds.get("name", ""),
+    topic=ds.get("topic", "general"),
+    metric_contracts=safe_contracts,
+    metric_contract_count=len(safe_contracts),
+  )
 
 
 @app.get("/api/training/presets")
@@ -5332,6 +6089,199 @@ def training_db_test_api():
         return jsonify({"error": msg}), 400
 
 
+@app.post("/api/training/adtc/db/test")
+def training_adtc_db_test_api():
+    if not SQLALCHEMY_AVAILABLE:
+        return jsonify({"error": "SQLAlchemy is not installed. Install with: pip install sqlalchemy"}), 400
+    data = request.get_json(silent=True) or {}
+    try:
+        url, db_type, _ = _resolve_url_from_payload(data)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    try:
+        engine = create_engine(url)
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return jsonify({"ok": True, "type": db_type, "url_masked": _mask_url(url)})
+    except Exception as exc:
+        msg = str(exc)
+        preset = DB_PRESETS.get(db_type)
+        if preset and preset.get("driver_pip") and "no module" in msg.lower():
+            msg += f" — install driver: pip install {preset['driver_pip']}"
+        return jsonify({"error": msg}), 400
+
+
+@app.post("/api/training/adtc/db/create-dataset")
+def training_adtc_db_create_dataset_api():
+    if not SQLALCHEMY_AVAILABLE:
+        return jsonify({"error": "SQLAlchemy is not installed. Install with: pip install sqlalchemy"}), 400
+
+    data = request.get_json(silent=True) or {}
+    dataset_name = str(data.get("name") or "").strip()
+    topic = str(data.get("topic") or "").strip() or "database"
+    if not dataset_name:
+        return jsonify({"error": "Dataset name is required"}), 400
+
+    try:
+        sample_rows = int(data.get("sample_rows") or 20)
+    except Exception:
+        sample_rows = 20
+    sample_rows = max(1, min(200, sample_rows))
+
+    tables_raw = str(data.get("tables") or "").strip()
+    requested_tables = [t.strip() for t in tables_raw.split(",") if t.strip()]
+    raw_metric_contracts = data.get("metric_contracts")
+    metric_contracts = []
+    if isinstance(raw_metric_contracts, list):
+      for item in raw_metric_contracts:
+        if not isinstance(item, dict):
+          continue
+        name = str(item.get("name") or "").strip()
+        formula = str(item.get("formula") or "").strip()
+        grain = str(item.get("grain") or "").strip()
+        unit = str(item.get("unit") or "").strip()
+        description = str(item.get("description") or "").strip()
+        source_tables_raw = item.get("source_tables")
+        if isinstance(source_tables_raw, str):
+          source_tables = [x.strip() for x in source_tables_raw.split(",") if x and x.strip()]
+        elif isinstance(source_tables_raw, list):
+          source_tables = [str(x).strip() for x in source_tables_raw if str(x).strip()]
+        else:
+          source_tables = []
+        if not (name or formula or grain or unit or description or source_tables):
+          continue
+        metric_contracts.append({
+          "name": name or f"metric_{len(metric_contracts) + 1}",
+          "formula": formula,
+          "source_tables": source_tables,
+          "grain": grain,
+          "unit": unit,
+          "description": description,
+        })
+
+    try:
+        url, db_type, _ = _resolve_url_from_payload(data)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    try:
+        engine = create_engine(url)
+        insp = inspect(engine)
+        all_tables = insp.get_table_names() or []
+    except Exception as exc:
+        return jsonify({"error": f"Connection/inspection failed: {exc}"}), 400
+
+    if requested_tables:
+        selected = [t for t in requested_tables if t in all_tables]
+    else:
+        selected = list(all_tables)
+    selected = selected[:50]
+
+    if not selected:
+        return jsonify({"error": "No matching tables found for ADTC dataset export"}), 400
+
+    dataset_id = _new_adtc_id()
+    ds_dir = ADTC_FILES_DIR / dataset_id
+    ds_dir.mkdir(parents=True, exist_ok=True)
+
+    export_name = "adtc_db_export.jsonl"
+    export_path = ds_dir / export_name
+    lines = []
+    exported_rows = 0
+    table_stats = []
+
+    for metric in metric_contracts:
+      lines.append(__import__("json").dumps({
+        "kind": "metric_contract",
+        "metric": metric,
+        "database_type": db_type,
+      }, ensure_ascii=True))
+
+    try:
+        with engine.connect() as conn:
+            q = engine.dialect.identifier_preparer.quote
+            for tname in selected:
+                try:
+                    cols = [c.get("name") for c in insp.get_columns(tname)]
+                except Exception:
+                    cols = []
+                lines.append(__import__("json").dumps({
+                    "kind": "table_meta",
+                    "table": tname,
+                    "columns": cols,
+                    "database_type": db_type,
+                }, ensure_ascii=True))
+
+                try:
+                    rs = conn.execute(text(f"SELECT * FROM {q(tname)}"))
+                    chunk = rs.mappings().fetchmany(sample_rows)
+                except Exception as exc:
+                    table_stats.append({"table": tname, "rows": 0, "error": str(exc)})
+                    continue
+
+                row_count = 0
+                for row in chunk:
+                    row_count += 1
+                    exported_rows += 1
+                    lines.append(__import__("json").dumps({
+                        "kind": "row",
+                        "table": tname,
+                        "row": dict(row),
+                    }, ensure_ascii=True, default=str))
+                table_stats.append({"table": tname, "rows": row_count})
+    except Exception as exc:
+        return jsonify({"error": f"Data export failed: {exc}"}), 400
+
+    if not lines:
+        _delete_adtc_storage(dataset_id)
+        return jsonify({"error": "No content exported from database"}), 400
+
+    export_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    ds = _normalize_adtc_dataset({
+        "id": dataset_id,
+        "name": dataset_name,
+        "topic": topic,
+        "files": [{
+            "name": export_name,
+            "original_name": export_name,
+            "ext": ".jsonl",
+            "kind": "jsonl",
+            "size_bytes": export_path.stat().st_size,
+        }],
+        "status": "saved",
+        "saved_at": _now_ts(),
+        "last_error": None,
+        "meta": {
+            "origin": "adtc_database_connection",
+            "db_type": db_type,
+            "table_count": len(selected),
+            "rows_exported": exported_rows,
+          "metric_contract_count": len(metric_contracts),
+          "metric_contracts": metric_contracts,
+        },
+    })
+    _persist_adtc_dataset(ds)
+    _append_audit_event("adtc.db.create_dataset", {
+        "dataset_id": dataset_id,
+        "name": dataset_name,
+        "topic": topic,
+        "db_type": db_type,
+        "tables": len(selected),
+        "rows_exported": exported_rows,
+        "metric_contracts": len(metric_contracts),
+    })
+
+    return jsonify({
+        "ok": True,
+        "dataset": _public_adtc_dataset(ds),
+        "tables_exported": len(selected),
+        "rows_exported": exported_rows,
+        "metric_contracts_count": len(metric_contracts),
+        "table_stats": table_stats,
+    })
+
+
 @app.post("/api/training/db/save")
 def training_db_save_api():
     data = request.get_json(silent=True) or {}
@@ -5517,7 +6467,7 @@ TRAINING_INDEX_HTML = r"""
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Phi-3 Training Center</title>
+  <title>AR Training Center</title>
   <style>
     :root { --bg:#0f172a; --panel:#1e293b; --line:#334155; --text:#e2e8f0; --muted:#94a3b8; --accent:#10b981; --warn:#ef4444; --info:#38bdf8; --amber:#f59e0b; }
     *{box-sizing:border-box}
@@ -5651,6 +6601,44 @@ TRAINING_INDEX_HTML = r"""
       </div>
 
       <div id="adtcResults" style="margin-top:10px"></div>
+
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+        <h4 style="margin:0 0 8px">Database Connection (ADTC Only)</h4>
+        <div class="k">This section is dedicated to ADTC: connect a database, sample rows, and create an ADTC dataset directly from DB content.</div>
+
+        <label>ADTC Dataset Name <span class="req">*</span></label>
+        <input id="adtcDbName" placeholder="e.g. ADTC Healthcare DB Snapshot" />
+
+        <label>Topic / Domain</label>
+        <input id="adtcDbTopic" placeholder="e.g. healthcare, crm, sales" />
+
+        <label>Database Type <span class="req">*</span></label>
+        <select id="adtcDbType"></select>
+        <div class="hint" id="adtcDbDriverHint"></div>
+
+        <div id="adtcDbFields"></div>
+
+        <label>Include Tables (optional, comma separated)</label>
+        <input id="adtcDbTables" placeholder="patients, appointments, doctors (leave empty for all)" />
+
+        <label>Sample rows per table</label>
+        <input id="adtcDbRows" type="number" value="20" min="1" max="200" />
+
+        <h5 style="margin:12px 0 6px">Metric Contracts (optional)</h5>
+        <div class="k">Add any number of metric definitions (for example TAT formulas) to bind business calculations with this ADTC DB dataset.</div>
+        <div id="metricContractsList" style="display:grid;gap:10px;margin-top:8px"></div>
+        <div class="toolbar" style="margin-top:8px">
+          <button id="addMetricContractBtn" type="button">+ Add Metric Contract</button>
+          <span class="k">Each metric can include formula, source tables, grain, and notes.</span>
+        </div>
+
+        <div class="toolbar">
+          <button id="adtcDbTestBtn">Test ADTC DB Connection</button>
+          <button class="primary" id="adtcDbCreateBtn" disabled>🧠 Create ADTC Dataset from DB</button>
+          <span class="k" id="adtcDbMsg"></span>
+        </div>
+        <div id="adtcDbResults" style="margin-top:8px"></div>
+      </div>
     </div>
 
     <div class="card" style="margin-top:14px">
@@ -5703,6 +6691,8 @@ TRAINING_INDEX_HTML = r"""
   <script>
     let PRESETS = {};
     let testedOk = false;
+    let adtcDbTestedOk = false;
+    let metricContractSeq = 0;
 
     async function api(url, options){
       const res = await fetch(url, options || {});
@@ -5751,6 +6741,36 @@ TRAINING_INDEX_HTML = r"""
       document.getElementById('saveDbBtn').disabled = true;
     }
 
+    function renderAdtcDbFields(){
+      const t = document.getElementById('adtcDbType').value;
+      const preset = PRESETS[t];
+      const wrap = document.getElementById('adtcDbFields');
+      wrap.innerHTML = '';
+      const hint = document.getElementById('adtcDbDriverHint');
+      hint.textContent = preset && preset.driver_pip
+        ? ('Required driver: pip install ' + preset.driver_pip)
+        : (preset ? 'No extra driver needed.' : '');
+      if(!preset) return;
+      for(const f of preset.fields){
+        const lab = document.createElement('label');
+        lab.innerHTML = f.label + (f.required ? ' <span class="req">*</span>' : '');
+        const inp = document.createElement('input');
+        inp.id = 'adtcf_' + f.key;
+        inp.dataset.key = f.key;
+        if(f.secret) inp.type = 'password';
+        if(f.placeholder) inp.placeholder = f.placeholder;
+        if(f.default) inp.value = f.default;
+        inp.oninput = () => {
+          adtcDbTestedOk = false;
+          document.getElementById('adtcDbCreateBtn').disabled = true;
+        };
+        wrap.appendChild(lab);
+        wrap.appendChild(inp);
+      }
+      adtcDbTestedOk = false;
+      document.getElementById('adtcDbCreateBtn').disabled = true;
+    }
+
     function collectPayload(){
       const t = document.getElementById('dbType').value;
       const preset = PRESETS[t] || {fields:[]};
@@ -5768,20 +6788,117 @@ TRAINING_INDEX_HTML = r"""
       };
     }
 
+    function collectAdtcDbPayload(){
+      const t = document.getElementById('adtcDbType').value;
+      const preset = PRESETS[t] || {fields:[]};
+      const fields = {};
+      for(const f of preset.fields){
+        const el = document.getElementById('adtcf_' + f.key);
+        if(el) fields[f.key] = el.value;
+      }
+      return {
+        name: document.getElementById('adtcDbName').value.trim(),
+        topic: document.getElementById('adtcDbTopic').value.trim(),
+        type: t,
+        fields: fields,
+        tables: document.getElementById('adtcDbTables').value,
+        sample_rows: Number(document.getElementById('adtcDbRows').value || 20),
+        metric_contracts: collectMetricContracts(),
+      };
+    }
+
+    function metricContractInputChanged(){
+      adtcDbTestedOk = false;
+      document.getElementById('adtcDbCreateBtn').disabled = true;
+    }
+
+    function addMetricContractCard(initial){
+      metricContractSeq += 1;
+      const idx = metricContractSeq;
+      const list = document.getElementById('metricContractsList');
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.metricId = String(idx);
+      card.style.padding = '10px';
+
+      const init = initial || {};
+      card.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">' +
+          '<b>Metric #' + idx + '</b>' +
+          '<button type="button" class="danger" data-role="remove-metric">Remove</button>' +
+        '</div>' +
+        '<label>Metric Name</label>' +
+        '<input class="mc-name" placeholder="e.g. Turn Around Time" value="' + ((init.name || '').replace(/"/g, '&quot;')) + '" />' +
+        '<label>Formula / Logic</label>' +
+        '<input class="mc-formula" placeholder="e.g. (reported_at - received_at) in minutes" value="' + ((init.formula || '').replace(/"/g, '&quot;')) + '" />' +
+        '<label>Source Tables (comma separated)</label>' +
+        '<input class="mc-tables" placeholder="e.g. lab_orders, lab_results" value="' + ((init.source_tables || '').replace(/"/g, '&quot;')) + '" />' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+          '<div><label>Grain</label><input class="mc-grain" placeholder="e.g. per order, daily" value="' + ((init.grain || '').replace(/"/g, '&quot;')) + '" /></div>' +
+          '<div><label>Unit</label><input class="mc-unit" placeholder="e.g. minutes, hours" value="' + ((init.unit || '').replace(/"/g, '&quot;')) + '" /></div>' +
+        '</div>' +
+        '<label>Description / Notes</label>' +
+        '<textarea class="mc-description" rows="2" placeholder="Optional mapping notes from your Word business rules document">' + (init.description || '') + '</textarea>';
+
+      const removeBtn = card.querySelector('[data-role="remove-metric"]');
+      removeBtn.onclick = () => {
+        card.remove();
+        metricContractInputChanged();
+      };
+
+      const fields = card.querySelectorAll('input, textarea');
+      fields.forEach((el) => { el.oninput = metricContractInputChanged; });
+
+      list.appendChild(card);
+      metricContractInputChanged();
+    }
+
+    function collectMetricContracts(){
+      const cards = document.querySelectorAll('#metricContractsList [data-metric-id]');
+      const out = [];
+      cards.forEach((card) => {
+        const name = ((card.querySelector('.mc-name') || {}).value || '').trim();
+        const formula = ((card.querySelector('.mc-formula') || {}).value || '').trim();
+        const tables = ((card.querySelector('.mc-tables') || {}).value || '').trim();
+        const grain = ((card.querySelector('.mc-grain') || {}).value || '').trim();
+        const unit = ((card.querySelector('.mc-unit') || {}).value || '').trim();
+        const description = ((card.querySelector('.mc-description') || {}).value || '').trim();
+        const sourceTables = tables ? tables.split(',').map(x => x.trim()).filter(Boolean) : [];
+        if(!(name || formula || sourceTables.length || grain || unit || description)) return;
+        out.push({
+          name: name,
+          formula: formula,
+          source_tables: sourceTables,
+          grain: grain,
+          unit: unit,
+          description: description,
+        });
+      });
+      return out;
+    }
+
     async function loadPresets(){
       const r = await api('/api/training/presets');
       PRESETS = r.presets;
       const sel = document.getElementById('dbType');
+      const adtcSel = document.getElementById('adtcDbType');
       sel.innerHTML = '';
+      adtcSel.innerHTML = '';
       for(const k of Object.keys(PRESETS)){
         const o = document.createElement('option');
         o.value = k; o.textContent = PRESETS[k].label;
         sel.appendChild(o);
+        const o2 = document.createElement('option');
+        o2.value = k; o2.textContent = PRESETS[k].label;
+        adtcSel.appendChild(o2);
       }
       sel.onchange = renderFields;
+      adtcSel.onchange = renderAdtcDbFields;
       renderFields();
+      renderAdtcDbFields();
       if(!r.sqlalchemy_available){
         document.getElementById('dbMsg').innerHTML = '<span style="color:#fca5a5">SQLAlchemy is not installed. Run: pip install sqlalchemy</span>';
+        document.getElementById('adtcDbMsg').innerHTML = '<span style="color:#fca5a5">SQLAlchemy is not installed. Run: pip install sqlalchemy</span>';
       }
     }
 
@@ -5868,6 +6985,7 @@ TRAINING_INDEX_HTML = r"""
               '<td>' + (d.last_added_docs || 0) + '</td>' +
               '<td>' +
                 '<button class="icon" title="Open ADTC Training" onclick="window.open(\'/training/adtc/run/' + d.id + '\', \'_blank\')">🔍 View</button> ' +
+                '<button class="icon" title="View Metric Contracts" onclick="window.open(\'/training/adtc/metrics/' + d.id + '\', \'_blank\')">📊 Metric</button> ' +
                 '<button class="icon danger" title="Delete ADTC dataset" onclick="deleteAdtcDataset(\'' + d.id + '\')">🗑</button>' +
               '</td>';
             adtcBody.appendChild(tr);
@@ -6070,6 +7188,61 @@ TRAINING_INDEX_HTML = r"""
         } catch(e){
           adtcMsgEl.innerHTML = '<span style="color:#fca5a5">Error: ' + e.message + '</span>';
         }
+      };
+
+      // --- ADTC Database Connection handlers ---
+      document.getElementById('adtcDbTestBtn').onclick = async () => {
+        const m = document.getElementById('adtcDbMsg');
+        const out = document.getElementById('adtcDbResults');
+        m.innerHTML = 'Testing ADTC DB connection...';
+        out.innerHTML = '';
+        try {
+          const r = await api('/api/training/adtc/db/test', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(collectAdtcDbPayload())
+          });
+          m.innerHTML = '<span style="color:#a7f3d0">✓ Connection OK (' + (r.url_masked || '') + ')</span>';
+          adtcDbTestedOk = true;
+          document.getElementById('adtcDbCreateBtn').disabled = false;
+        } catch(e){
+          m.innerHTML = '<span style="color:#fca5a5">✗ ' + e.message + '</span>';
+          adtcDbTestedOk = false;
+          document.getElementById('adtcDbCreateBtn').disabled = true;
+        }
+      };
+
+      document.getElementById('adtcDbCreateBtn').onclick = async () => {
+        const m = document.getElementById('adtcDbMsg');
+        const out = document.getElementById('adtcDbResults');
+        if(!adtcDbTestedOk){
+          m.innerHTML = '<span style="color:#fca5a5">Run a successful Test before creating ADTC dataset.</span>';
+          return;
+        }
+        const p = collectAdtcDbPayload();
+        if(!p.name){
+          m.innerHTML = '<span style="color:#fca5a5">ADTC Dataset name is required.</span>';
+          return;
+        }
+        m.innerHTML = 'Creating ADTC dataset from DB...';
+        out.innerHTML = '';
+        try {
+          const r = await api('/api/training/adtc/db/create-dataset', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(p)
+          });
+          const ds = r.dataset || {};
+          m.innerHTML = '<span style="color:#a7f3d0">✓ ADTC dataset created from DB: "' + (ds.name || p.name) + '"</span>';
+          out.innerHTML = '<div class="k">Tables exported: ' + (r.tables_exported || 0) + ' · Rows exported: ' + (r.rows_exported || 0) + ' · Metric contracts: ' + (r.metric_contracts_count || 0) + '</div>';
+          await refreshStatus();
+        } catch(e){
+          m.innerHTML = '<span style="color:#fca5a5">Error: ' + e.message + '</span>';
+        }
+      };
+
+      document.getElementById('addMetricContractBtn').onclick = () => {
+        addMetricContractCard();
       };
 
       loadPresets().then(refreshStatus);
@@ -6335,6 +7508,95 @@ ADTC_RUN_HTML = r"""
     loadDataset();
     setInterval(loadDataset, 5000);
   </script>
+</body>
+</html>
+"""
+
+
+ADTC_METRICS_HTML = r"""
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ADTC Metrics - {{ dataset_name }}</title>
+  <style>
+    :root { --bg:#0f172a; --panel:#1e293b; --line:#334155; --text:#e2e8f0; --muted:#94a3b8; --accent:#10b981; }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:Segoe UI,system-ui,sans-serif}
+    .wrap{max-width:1150px;margin:0 auto;padding:16px}
+    .head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+    .k{color:var(--muted);font-size:12px}
+    button{border:1px solid var(--line);background:#0b1220;color:var(--text);border-radius:10px;padding:9px 12px;cursor:pointer;font-size:13px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid var(--line);font-size:12px;text-align:left;vertical-align:top}
+    th{color:var(--muted);font-weight:600}
+    .pill{display:inline-block;background:#0b1220;border:1px solid var(--line);padding:6px 10px;border-radius:10px;font-size:12px;margin-right:8px}
+    .mono{font-family:Consolas, monospace;white-space:pre-wrap;word-break:break-word}
+    ul{margin:0;padding-left:18px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <div>
+        <h2 style="margin:0">ADTC Metric Contracts (Read Only)</h2>
+        <div class="k">Dataset: {{ dataset_name }} · Topic: {{ topic }}</div>
+      </div>
+      <div>
+        <button onclick="window.location.href='/training'">Training Center</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="pill">Dataset ID: <b>{{ dataset_id }}</b></span>
+      <span class="pill">Metrics: <b>{{ metric_contract_count }}</b></span>
+    </div>
+
+    <div class="card">
+      {% if metric_contract_count == 0 %}
+      <div class="k">No metric contracts were defined for this ADTC dataset.</div>
+      {% else %}
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Formula / Logic</th>
+            <th>Source Tables</th>
+            <th>Grain</th>
+            <th>Unit</th>
+            <th>Description / Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in metric_contracts %}
+          <tr>
+            <td>{{ m.idx }}</td>
+            <td>{{ m.name or '-' }}</td>
+            <td class="mono">{{ m.formula or '-' }}</td>
+            <td>
+              {% if m.source_tables and m.source_tables|length > 0 %}
+              <ul>
+                {% for t in m.source_tables %}
+                <li>{{ t }}</li>
+                {% endfor %}
+              </ul>
+              {% else %}
+              -
+              {% endif %}
+            </td>
+            <td>{{ m.grain or '-' }}</td>
+            <td>{{ m.unit or '-' }}</td>
+            <td>{{ m.description or '-' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </div>
 </body>
 </html>
 """
@@ -6988,15 +8250,29 @@ def api_docs():
     docs_html = """
     <html>
     <head>
-      <title>Phi-3 API Documentation</title>
+      <title>AR API Documentation</title>
       <style>
-        body { font-family: Segoe UI, sans-serif; max-width: 980px; margin: 24px auto; padding: 0 12px; }
+        body { font-family: Segoe UI, sans-serif; max-width: 1080px; margin: 24px auto; padding: 0 12px; }
         code, pre { background: #f2f2f2; padding: 2px 6px; border-radius: 5px; }
         pre { padding: 12px; overflow: auto; }
+        .muted { color: #555; }
       </style>
     </head>
     <body>
-      <h1>Phi-3 API Documentation</h1>
+      <h1>AR API Documentation</h1>
+      <p class="muted">Use this guide to connect any external app (Python / PHP / JavaScript) to send prompts and receive answers.</p>
+
+      <h2>Base URL</h2>
+      <p><code>http://127.0.0.1:5000</code></p>
+
+      <h2>Integration Flow (required)</h2>
+      <ol>
+        <li>Create a chat: <code>POST /api/chats</code></li>
+        <li>Take the returned <code>chat.id</code></li>
+        <li>Send prompt: <code>POST /api/chat</code> with <code>chat_id</code> and <code>message</code></li>
+        <li>Read assistant answer from <code>reply</code> in response JSON</li>
+      </ol>
+
       <h2>Chat Memory Endpoints</h2>
       <ul>
         <li><code>GET /api/chats</code> - list all chat memories.</li>
@@ -7011,11 +8287,250 @@ def api_docs():
         <li><code>GET /api/config</code> - read generation settings.</li>
         <li><code>POST /api/config</code> - update generation settings.</li>
       </ul>
-      <h2>Example: send message to a chat</h2>
+
+      <h2>Request Body: POST /api/chat</h2>
       <pre>{
   "chat_id": "abc123def456",
   "message": "Continue from where we stopped yesterday"
 }</pre>
+
+      <h2>Expected Response (sample)</h2>
+      <pre>{
+  "reply": "Here is the answer...",
+  "chat": {
+    "id": "abc123def456",
+    "title": "...",
+    "updated_at": 1710000000
+  }
+}</pre>
+
+      <h2>cURL Example</h2>
+      <pre># 1) Create chat
+curl -X POST http://127.0.0.1:5000/api/chats \\
+  -H "Content-Type: application/json" \\
+  -d "{\"title\":\"External App Session\"}"
+
+# 2) Send prompt (replace CHAT_ID)
+curl -X POST http://127.0.0.1:5000/api/chat \\
+  -H "Content-Type: application/json" \\
+  -d "{\"chat_id\":\"CHAT_ID\",\"message\":\"What is ADTC?\"}"</pre>
+
+      <h2>Python Example (requests)</h2>
+      <pre>import requests
+
+BASE = "http://127.0.0.1:5000"
+
+# 1) Create chat
+r = requests.post(f"{BASE}/api/chats", json={"title": "Python Client"}, timeout=30)
+r.raise_for_status()
+chat_id = r.json()["chat"]["id"]
+
+# 2) Send prompt
+r = requests.post(
+    f"{BASE}/api/chat",
+    json={"chat_id": chat_id, "message": "Explain turn around time metric"},
+    timeout=120,
+)
+r.raise_for_status()
+data = r.json()
+print("Assistant reply:\n", data.get("reply", ""))</pre>
+
+      <h2>PHP Example (cURL)</h2>
+      <pre>&lt;?php
+$base = "http://127.0.0.1:5000";
+
+function postJson($url, $payload) {
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    $resp = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    if ($resp === false || $code &gt;= 400) {
+        die("HTTP error: " . $code . " " . curl_error($ch));
+    }
+    curl_close($ch);
+    return json_decode($resp, true);
+}
+
+$chat = postJson($base . "/api/chats", ["title" =&gt; "PHP Client"]);
+$chatId = $chat["chat"]["id"];
+
+$answer = postJson($base . "/api/chat", [
+    "chat_id" =&gt; $chatId,
+    "message" =&gt; "Give me ADTC summary"
+]);
+
+echo $answer["reply"] . PHP_EOL;
+?&gt;</pre>
+
+      <h2>JavaScript Example (Node.js / Browser fetch)</h2>
+      <pre>const BASE = "http://127.0.0.1:5000";
+
+async function run() {
+  const c = await fetch(`${BASE}/api/chats`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: "JS Client" })
+  });
+  if (!c.ok) throw new Error(`Create chat failed: ${c.status}`);
+  const chat = await c.json();
+  const chatId = chat.chat.id;
+
+  const r = await fetch(`${BASE}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, message: "What are ADTC metrics?" })
+  });
+  if (!r.ok) throw new Error(`Chat failed: ${r.status}`);
+  const data = await r.json();
+  console.log(data.reply);
+}
+
+run().catch(console.error);</pre>
+
+      <h2>Ready Chat Icon Widget (JavaScript)</h2>
+      <p class="muted">Embed this snippet in any web page. It shows a floating icon; when clicked, a chat popup opens and starts conversation using the API.</p>
+      <pre>&lt;script&gt;
+(function () {
+  const BASE = "http://127.0.0.1:5000";
+  let chatId = null;
+
+  async function api(path, payload) {
+    const r = await fetch(BASE + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload || {})
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+    return data;
+  }
+
+  async function ensureChat() {
+    if (chatId) return chatId;
+    const created = await api("/api/chats", { title: "Widget Session" });
+    chatId = created.chat.id;
+    return chatId;
+  }
+
+  const btn = document.createElement("button");
+  btn.id = "phi-chat-fab";
+  btn.innerText = "💬";
+  btn.style.cssText = "position:fixed;right:20px;bottom:20px;width:56px;height:56px;border:none;border-radius:50%;cursor:pointer;background:#10b981;color:#052e26;font-size:24px;box-shadow:0 8px 20px rgba(0,0,0,.25);z-index:99999";
+
+  const panel = document.createElement("div");
+  panel.id = "phi-chat-panel";
+  panel.style.cssText = "display:none;position:fixed;right:20px;bottom:88px;width:360px;max-width:92vw;height:520px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:14px;z-index:99999;overflow:hidden;font-family:Segoe UI,sans-serif";
+  panel.innerHTML = ""
+    + "&lt;div style='padding:10px 12px;border-bottom:1px solid #334155;display:flex;justify-content:space-between;align-items:center'&gt;"
+    + "&lt;b&gt;AI Chat&lt;/b&gt;&lt;button id='phi-chat-close' style='background:transparent;border:1px solid #334155;color:#e2e8f0;border-radius:8px;cursor:pointer'&gt;✕&lt;/button&gt;"
+    + "&lt;/div&gt;"
+    + "&lt;div id='phi-chat-log' style='height:410px;overflow:auto;padding:10px;background:#020617'&gt;&lt;/div&gt;"
+    + "&lt;div style='display:flex;gap:8px;padding:10px;border-top:1px solid #334155'&gt;"
+    + "&lt;input id='phi-chat-input' placeholder='Type your message...' style='flex:1;padding:8px;border-radius:8px;border:1px solid #334155;background:#0b1220;color:#e2e8f0' /&gt;"
+    + "&lt;button id='phi-chat-send' style='padding:8px 12px;border-radius:8px;border:none;background:#10b981;color:#052e26;cursor:pointer'&gt;Send&lt;/button&gt;"
+    + "&lt;/div&gt;";
+
+  function addMsg(role, text) {
+    const log = document.getElementById("phi-chat-log");
+    const item = document.createElement("div");
+    const bg = role === "user" ? "#0b3b2f" : "#1e293b";
+    item.style.cssText = "margin:8px 0;padding:8px 10px;border-radius:10px;background:" + bg + ";white-space:pre-wrap";
+    item.innerText = (role === "user" ? "You: " : "Assistant: ") + text;
+    log.appendChild(item);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  async function send() {
+    const input = document.getElementById("phi-chat-input");
+    const message = (input.value || "").trim();
+    if (!message) return;
+    input.value = "";
+    addMsg("user", message);
+    try {
+      const id = await ensureChat();
+      const res = await api("/api/chat", { chat_id: id, message: message });
+      addMsg("assistant", res.reply || "(empty)");
+    } catch (err) {
+      addMsg("assistant", "Error: " + err.message);
+    }
+  }
+
+  btn.onclick = () =&gt; {
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
+  };
+
+  document.body.appendChild(btn);
+  document.body.appendChild(panel);
+
+  panel.addEventListener("click", function (e) {
+    if (e.target && e.target.id === "phi-chat-close") panel.style.display = "none";
+    if (e.target && e.target.id === "phi-chat-send") send();
+  });
+
+  panel.addEventListener("keydown", function (e) {
+    if (e.target && e.target.id === "phi-chat-input" && e.key === "Enter") send();
+  });
+})();
+&lt;/script&gt;</pre>
+
+      <h2>Power BI Integration (Option 1: Power Query M)</h2>
+      <p class="muted">Use this M function to send a prompt and receive one assistant reply as text.</p>
+      <pre>let
+  FxAskPhi = (Prompt as text) as text =&gt;
+  let
+    BaseUrl = "http://127.0.0.1:5000",
+    Headers = [#"Content-Type" = "application/json"],
+
+    CreateChatBody = Json.FromValue([title = "Power BI Session"]),
+    CreateChatResp = Json.Document(
+      Web.Contents(BaseUrl, [
+        RelativePath = "api/chats",
+        Headers = Headers,
+        Content = CreateChatBody
+      ])
+    ),
+    ChatId = CreateChatResp[chat][id],
+
+    AskBody = Json.FromValue([
+      chat_id = ChatId,
+      message = Prompt
+    ]),
+    AskResp = Json.Document(
+      Web.Contents(BaseUrl, [
+        RelativePath = "api/chat",
+        Headers = Headers,
+        Content = AskBody
+      ])
+    ),
+    Reply = try Text.From(AskResp[reply]) otherwise ""
+  in
+    Reply
+in
+  FxAskPhi</pre>
+
+      <h2>Power BI Integration (Option 2: Button / Visual)</h2>
+      <p class="muted">Use a Button with Web URL action to open the chat UI in browser, or use HTML Content custom visual with the widget snippet above.</p>
+      <ul>
+        <li>Button URL action target: <code>http://127.0.0.1:5000/</code></li>
+        <li>For custom visual (HTML Content), paste the widget snippet from <b>Ready Chat Icon Widget</b>.</li>
+        <li>If Power BI Service cannot access localhost, publish the API on reachable host/IP first.</li>
+      </ul>
+
+      <h2>Troubleshooting</h2>
+      <ul>
+        <li>If you get <code>404</code>, verify the correct URL and endpoint path.</li>
+        <li>If you get <code>chat not found</code>, make sure you are using a valid <code>chat_id</code> from <code>POST /api/chats</code>.</li>
+        <li>If request hangs, increase HTTP timeout on client side (model generation may take time).</li>
+        <li>For browser integrations, ensure CORS/network policy allows calling <code>http://127.0.0.1:5000</code>.</li>
+        <li>Power BI Desktop may block unsecured HTTP in some environments; if needed use trusted host/HTTPS.</li>
+      </ul>
+
+      <h2>Machine-readable Schema</h2>
+      <p>OpenAPI JSON: <a href="/api/docs/json">/api/docs/json</a></p>
+
       <p><a href="/">Back to chat UI</a></p>
     </body>
     </html>
@@ -7027,7 +8542,7 @@ def api_docs():
 def api_docs_json():
     schema = {
         "openapi": "3.0.0",
-        "info": {"title": "Phi-3 Local Chat API", "version": "2.0.0"},
+        "info": {"title": "AR Local Chat API", "version": "2.0.0"},
         "paths": {
             "/api/chats": {
                 "get": {"summary": "List chats"},
@@ -7072,6 +8587,21 @@ def api_docs_json():
             "/api/config": {
                 "get": {"summary": "Read generation config"},
                 "post": {"summary": "Update generation config"},
+            },
+            "/api/qa-memory": {
+              "get": {"summary": "List stored Q/A memory items for ADTC curation"},
+            },
+            "/api/qa-memory/review": {
+              "post": {"summary": "Approve/reject/reset a Q/A memory item"},
+            },
+            "/api/qa-memory/export-adtc": {
+              "post": {"summary": "Export approved Q/A memory items as a new ADTC dataset"},
+            },
+            "/api/training/adtc/db/test": {
+              "post": {"summary": "Test ADTC-only database connection"},
+            },
+            "/api/training/adtc/db/create-dataset": {
+              "post": {"summary": "Create ADTC dataset from database sampled rows with optional metric contracts"},
             },
         },
     }
@@ -7321,6 +8851,11 @@ def set_config():
         temperature = float(data.get("temperature", RUNTIME_CONFIG["temperature"]))
         top_p = float(data.get("top_p", RUNTIME_CONFIG["top_p"]))
         stop = data.get("stop", RUNTIME_CONFIG["stop"])
+        raw_adtc_threads = data.get("adtc_threads", RUNTIME_CONFIG.get("adtc_threads"))
+        if raw_adtc_threads in (None, "", 0, "0"):
+          adtc_threads = None
+        else:
+          adtc_threads = int(raw_adtc_threads)
 
         if not isinstance(stop, list) or not all(isinstance(x, str) for x in stop):
             raise ValueError("stop must be an array of strings")
@@ -7330,6 +8865,9 @@ def set_config():
             raise ValueError("temperature must be in range 0..2")
         if top_p <= 0 or top_p > 1:
             raise ValueError("top_p must be in range (0..1]")
+        max_allowed_threads = max(1, os.cpu_count() or MODEL_THREADS)
+        if adtc_threads is not None and (adtc_threads < 1 or adtc_threads > max_allowed_threads):
+          raise ValueError(f"adtc_threads must be null or in range 1..{max_allowed_threads}")
     except (TypeError, ValueError) as exc:
         return jsonify({"error": str(exc)}), 400
 
@@ -7338,6 +8876,7 @@ def set_config():
         RUNTIME_CONFIG["temperature"] = temperature
         RUNTIME_CONFIG["top_p"] = top_p
         RUNTIME_CONFIG["stop"] = stop
+        RUNTIME_CONFIG["adtc_threads"] = adtc_threads
         cfg = deepcopy(RUNTIME_CONFIG)
 
     return jsonify(cfg)
@@ -7399,11 +8938,12 @@ def chat_api():
 
     _monitor_stage("retrieving-knowledge")
     know_start = time.perf_counter()
+    retrieval_query = _expand_retrieval_query(message)
     if knowledge_mode == "adtc_only":
-      knowledge_docs, retrieval_trace = _retrieve_knowledge_with_trace(message, limit=5, source_filter="adtc")
+      knowledge_docs, retrieval_trace = _retrieve_knowledge_with_trace(retrieval_query, limit=5, source_filter="adtc")
     else:
-      knowledge_docs, retrieval_trace = _retrieve_knowledge_with_trace(message, limit=5)
-    reasoning_bundle = _build_reasoning_bundle(message, knowledge_docs)
+      knowledge_docs, retrieval_trace = _retrieve_knowledge_with_trace(retrieval_query, limit=5)
+    reasoning_bundle = _build_reasoning_bundle(retrieval_query, knowledge_docs)
     know_ms = (time.perf_counter() - know_start) * 1000.0
 
     load_ms = (time.perf_counter() - load_start) * 1000.0
@@ -7492,6 +9032,20 @@ def chat_api():
         "knowledge_hits": len(knowledge_docs),
         "reasoning_conflicts": int(reasoning_bundle.get("conflict_count") or 0),
       })
+      try:
+        _append_qa_memory_item(
+          chat_id=chat_id,
+          request_id=request_id,
+          question=message,
+          answer=reply,
+          knowledge_mode=knowledge_mode,
+          response_mode=response_mode,
+          quality=quality,
+          confidence=confidence,
+          sources=sources,
+        )
+      except Exception:
+        pass
       return jsonify({
         "request_id": request_id,
         "chat_id": chat_id,
@@ -7506,36 +9060,32 @@ def chat_api():
 
     try:
       infer_start = time.perf_counter()
+      adtc_threads = _effective_adtc_threads() if knowledge_mode == "adtc_only" else None
+      adtc_llm = _llm_for_adtc_threads(adtc_threads) if knowledge_mode == "adtc_only" else llm
       grounded_answer = _answer_from_knowledge(message, knowledge_docs)
       if knowledge_mode == "adtc_only":
-        if knowledge_docs:
-          # ADTC-only now performs real model reasoning using only ADTC retrieved docs.
-          _monitor_stage("inference")
-          # Prevent repeating stale assistant phrasing/snippet dumps from prior turns.
-          adtc_history = [m for m in history if str(m.get("role")) == "user"][-8:]
-          reply, usage = model_reply(
+        _monitor_stage("grounded-answer")
+        if grounded_answer:
+          reply = grounded_answer
+          usage = {"completion_tokens": _estimate_tokens(reply)}
+        elif knowledge_docs:
+          synth = _synthesize_from_snippets(
             message,
-            adtc_history,
-            knowledge_docs=knowledge_docs,
-            force_synthesis=True,
-            reasoning_bundle=reasoning_bundle,
+            knowledge_docs,
             response_mode=response_mode,
+            llm_instance=adtc_llm,
           )
-          if _looks_like_refusal(reply):
-            # Force a clean synthesis pass instead of dumping raw snippets verbatim.
-            synth = _synthesize_from_snippets(message, knowledge_docs, response_mode=response_mode)
-            if synth:
-              _monitor_stage("grounded-answer")
-              reply = synth
-              usage = {"completion_tokens": _estimate_tokens(reply)}
-            else:
-              grounded = _answer_from_knowledge(message, knowledge_docs)
-              if grounded:
-                _monitor_stage("grounded-answer")
-                reply = grounded
-                usage = {"completion_tokens": _estimate_tokens(reply)}
+          if synth and not _looks_garbled_reply(synth):
+            reply = synth
+            usage = {"completion_tokens": _estimate_tokens(reply)}
+          else:
+            reply = (
+              "From trained ADTC data:\n"
+              "I could not find a confident direct answer in the currently retrieved ADTC snippets for this query. "
+              "Please rephrase using terms that appear in your ADTC files."
+            )
+            usage = {"completion_tokens": _estimate_tokens(reply)}
         else:
-          _monitor_stage("grounded-answer")
           reply = (
             "From trained ADTC data:\n"
             "I could not find a matching answer in ADTC-trained documents for this query. "
@@ -7555,6 +9105,20 @@ def chat_api():
           reasoning_bundle=reasoning_bundle,
           response_mode=response_mode,
         )
+
+      if not str(reply or "").strip():
+        grounded_fallback = _answer_from_knowledge(message, knowledge_docs)
+        if grounded_fallback:
+          _monitor_stage("grounded-answer")
+          reply = grounded_fallback
+          usage = {"completion_tokens": _estimate_tokens(reply)}
+        elif knowledge_mode == "adtc_only":
+          reply = (
+            "From trained ADTC data:\n"
+            "I could not find a confident direct answer for this phrasing. "
+            "Please try a shorter form with key entities (for example doctor/clinic names)."
+          )
+          usage = {"completion_tokens": _estimate_tokens(reply)}
       infer_ms = (time.perf_counter() - infer_start) * 1000.0
     except Exception as exc:
         _monitor_finish(
@@ -7657,6 +9221,21 @@ def chat_api():
       "knowledge_hits": len(knowledge_docs),
       "reasoning_conflicts": int(reasoning_bundle.get("conflict_count") or 0),
     })
+
+    try:
+      _append_qa_memory_item(
+        chat_id=chat_id,
+        request_id=request_id,
+        question=message,
+        answer=reply,
+        knowledge_mode=knowledge_mode,
+        response_mode=response_mode,
+        quality=quality,
+        confidence=confidence,
+        sources=sources,
+      )
+    except Exception:
+      pass
 
     return jsonify({
       "request_id": request_id,

@@ -1160,6 +1160,153 @@
       "schema_version": 1,
       "created_at": 1778234568,
       "updated_at": 1778237022
+    },
+    {
+      "id": "adtc_4347a4043c",
+      "name": "QA Memory Export Test",
+      "topic": "qa-memory",
+      "files": [
+        {
+          "name": "qa_memory_export.jsonl",
+          "original_name": "qa_memory_export.jsonl",
+          "ext": ".jsonl",
+          "kind": "jsonl",
+          "size_bytes": 2547
+        }
+      ],
+      "status": "saved",
+      "saved_at": 1778471417,
+      "last_error": null,
+      "schema_version": 1,
+      "created_at": 1778471417,
+      "updated_at": 1778471417,
+      "last_trained_at": null,
+      "last_added_docs": 0,
+      "last_results": [],
+      "doc_ids": [],
+      "relationships": [],
+      "insights": [],
+      "learned_details": [],
+      "integration_report": {}
+    },
+    {
+      "id": "adtc_47ddb21b8b",
+      "name": "test_2026-05-11_07-59-27",
+      "topic": "qa-memory",
+      "files": [
+        {
+          "name": "qa_memory_export.jsonl",
+          "original_name": "qa_memory_export.jsonl",
+          "ext": ".jsonl",
+          "kind": "jsonl",
+          "size_bytes": 402
+        }
+      ],
+      "status": "saved",
+      "saved_at": 1778471967,
+      "last_error": null,
+      "schema_version": 1,
+      "created_at": 1778471967,
+      "updated_at": 1778471967,
+      "last_trained_at": null,
+      "last_added_docs": 0,
+      "last_results": [],
+      "doc_ids": [],
+      "relationships": [],
+      "insights": [],
+      "learned_details": [],
+      "integration_report": {}
+    },
+    {
+      "id": "adtc_87874df1ea",
+      "name": "ADTC DB Section Demo",
+      "topic": "healthcare",
+      "files": [
+        {
+          "name": "adtc_db_export.jsonl",
+          "original_name": "adtc_db_export.jsonl",
+          "ext": ".jsonl",
+          "kind": "jsonl",
+          "size_bytes": 271
+        }
+      ],
+      "status": "saved",
+      "saved_at": 1778472202,
+      "last_error": null,
+      "meta": {
+        "origin": "adtc_database_connection",
+        "db_type": "sqlite",
+        "table_count": 1,
+        "rows_exported": 2
+      },
+      "schema_version": 1,
+      "created_at": 1778472202,
+      "updated_at": 1778472202,
+      "last_trained_at": null,
+      "last_added_docs": 0,
+      "last_results": [],
+      "doc_ids": [],
+      "relationships": [],
+      "insights": [],
+      "learned_details": [],
+      "integration_report": {}
+    },
+    {
+      "id": "adtc_279af5382a",
+      "name": "ADTC DB + Metrics",
+      "topic": "lab",
+      "files": [
+        {
+          "name": "adtc_db_export.jsonl",
+          "original_name": "adtc_db_export.jsonl",
+          "ext": ".jsonl",
+          "kind": "jsonl",
+          "size_bytes": 744
+        }
+      ],
+      "status": "saved",
+      "saved_at": 1778473677,
+      "last_error": null,
+      "meta": {
+        "origin": "adtc_database_connection",
+        "db_type": "sqlite",
+        "table_count": 1,
+        "rows_exported": 1,
+        "metric_contract_count": 2,
+        "metric_contracts": [
+          {
+            "name": "Turn Around Time",
+            "formula": "(reported_at - received_at) in minutes",
+            "source_tables": [
+              "lab_orders"
+            ],
+            "grain": "per order",
+            "unit": "minutes",
+            "description": "Core operational KPI"
+          },
+          {
+            "name": "SLA Breach Rate",
+            "formula": "count(TAT > 60) / count(all)",
+            "source_tables": [
+              "lab_orders"
+            ],
+            "grain": "daily",
+            "unit": "ratio",
+            "description": ""
+          }
+        ]
+      },
+      "schema_version": 1,
+      "created_at": 1778473677,
+      "updated_at": 1778473677,
+      "last_trained_at": null,
+      "last_added_docs": 0,
+      "last_results": [],
+      "doc_ids": [],
+      "relationships": [],
+      "insights": [],
+      "learned_details": [],
+      "integration_report": {}
     }
   ]
 }

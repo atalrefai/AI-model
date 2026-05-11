@@ -392,6 +392,50 @@ curl -X POST http://127.0.0.1:5000/api/eval/run
 | Hedging answers ("contact the clinic") | Synthesis fallback didn't trigger | Check `_looks_like_refusal` markers; ensure `knowledge_mode = adtc_only` |
 | MySQL/MariaDB stats 500 (`ONLY_FULL_GROUP_BY`) | Missing GROUP BY columns | Already handled in helpers; otherwise add the missing columns |
 
+### 13. Recent Updates (May 2026)
+
+This section summarizes the latest practical changes added to the codebase.
+
+1. **ADTC database-to-dataset flow added** in `web2.py`:
+    - New ADTC-only DB test endpoint: `POST /api/training/adtc/db/test`.
+    - New ADTC dataset creation endpoint from database content:
+       `POST /api/training/adtc/db/create-dataset`.
+    - The created ADTC dataset now records DB metadata such as DB type,
+       table count, exported rows, and metric contracts metadata.
+
+2. **Metric Contracts support for ADTC DB training**:
+    - You can define business metrics (name, formula, source tables,
+       grain, unit, notes) before creating the ADTC dataset.
+    - Metric contracts are persisted under each ADTC dataset `meta`
+       (`metric_contract_count`, `metric_contracts`) and exposed in API response.
+
+3. **Training Center UI enhancements** (`TRAINING_INDEX_HTML` in `web2.py`):
+    - New "Database Connection (ADTC Only)" block.
+    - Dynamic DB driver fields, table selection, row sampling, metric cards.
+    - New actions: test ADTC DB connection and create ADTC dataset from DB.
+    - New quick action button to view metric contracts per ADTC dataset.
+
+4. **New ADTC metrics read-only page**:
+    - Added `ADTC_METRICS_HTML` in `web2.py`.
+    - Added route to inspect saved metric contracts per dataset
+       (`/training/adtc/metrics/<dataset_id>` from UI).
+
+5. **Documentation page refresh in app**:
+    - In-app API docs title was updated to "AR API Documentation".
+    - Integration flow and ready-to-use examples (cURL, Python, PHP)
+       were expanded inside `/api/docs`.
+
+6. **Training memory updates** (`training_memory/adtc_datasets.json`):
+    - Added new ADTC dataset entries from QA-memory and DB export tests
+       (for example IDs `adtc_4347a4043c`, `adtc_47ddb21b8b`,
+       `adtc_87874df1ea`, `adtc_279af5382a`).
+    - Some entries include metric contracts captured during DB dataset creation.
+
+7. **QA memory logs added**:
+    - `training_memory/qa_memory_log.jsonl` stores QA answer snapshots.
+    - `training_memory/qa_memory_review.jsonl` stores review decisions
+       (approved/rejected) for QA entries.
+
 ---
 
 ## 🇸🇦 العربية
@@ -671,6 +715,52 @@ curl -X POST http://127.0.0.1:5000/api/eval/run
 | الإجابة تعرض اسم الملف فقط أو نص خام طويل | استخراج ضعيف | أعد تشغيل تدريب ADTC وراجع درجة التغطية في الملخص التنفيذي |
 | إجابات تهرّبية ("راجع العيادة") | لم يُفعَّل البديل التركيبي | تحقّق من علامات `_looks_like_refusal` وتأكد من `knowledge_mode = adtc_only` |
 | خطأ MySQL `ONLY_FULL_GROUP_BY` | أعمدة غير مجمّعة في الاستعلام | أضف الأعمدة المفقودة لـ GROUP BY |
+
+### 13. آخر التعديلات (مايو 2026)
+
+هذا القسم يوضّح آخر التغييرات العملية التي أُضيفت للمشروع.
+
+1. **إضافة مسار تحويل قاعدة البيانات إلى Dataset خاص بـ ADTC** داخل `web2.py`:
+    - نقطة اختبار جديدة لقاعدة بيانات ADTC:
+       `POST /api/training/adtc/db/test`.
+    - نقطة جديدة لإنشاء ADTC Dataset مباشرة من محتوى قاعدة البيانات:
+       `POST /api/training/adtc/db/create-dataset`.
+    - أصبح حفظ الـ dataset يتضمن بيانات وصفية عن القاعدة:
+       نوع قاعدة البيانات، عدد الجداول، عدد الصفوف المصدّرة، وبيانات عقود المقاييس.
+
+2. **دعم Metric Contracts أثناء تدريب ADTC من قاعدة البيانات**:
+    - يمكن تعريف مقاييس أعمال (الاسم، المعادلة، الجداول المصدر، مستوى القياس، الوحدة، ملاحظات)
+       قبل إنشاء الـ dataset.
+    - يتم حفظ هذه العقود داخل `meta` لكل ADTC dataset
+       (`metric_contract_count`, `metric_contracts`) وإرجاعها في الاستجابة.
+
+3. **تطوير واجهة مركز التدريب** (`TRAINING_INDEX_HTML` في `web2.py`):
+    - إضافة قسم جديد "Database Connection (ADTC Only)".
+    - توليد حقول الاتصال بشكل ديناميكي حسب نوع القاعدة، مع اختيار الجداول وعدد الصفوف.
+    - إضافة بطاقات لإدارة عقود المقاييس.
+    - إضافة أزرار لاختبار الاتصال وإنشاء ADTC dataset مباشرة من DB.
+    - إضافة زر سريع لعرض Metric Contracts لكل ADTC dataset.
+
+4. **إضافة صفحة عرض عقود المقاييس (قراءة فقط)**:
+    - تمت إضافة قالب `ADTC_METRICS_HTML` داخل `web2.py`.
+    - إضافة مسار لعرض العقود المحفوظة لكل dataset
+       (`/training/adtc/metrics/<dataset_id>` عبر الواجهة).
+
+5. **تحديث صفحة توثيق API داخل التطبيق**:
+    - تغيير عنوان صفحة التوثيق إلى "AR API Documentation".
+    - توسيع شرح الربط وإضافة أمثلة جاهزة (cURL و Python و PHP)
+       داخل `/api/docs`.
+
+6. **تحديثات في ذاكرة التدريب** (`training_memory/adtc_datasets.json`):
+    - إضافة datasets جديدة من اختبارات QA Memory وتصدير قواعد البيانات
+       (مثل `adtc_4347a4043c` و `adtc_47ddb21b8b`
+       و `adtc_87874df1ea` و `adtc_279af5382a`).
+    - بعض هذه السجلات تحتوي عقود مقاييس تم حفظها من مرحلة إنشاء dataset من DB.
+
+7. **إضافة سجلات QA Memory**:
+    - `training_memory/qa_memory_log.jsonl` لحفظ لقطات أسئلة/إجابات QA.
+    - `training_memory/qa_memory_review.jsonl` لحفظ قرارات المراجعة
+       (قبول/رفض) لكل عنصر QA.
 
 ---
 
