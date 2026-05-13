@@ -303,6 +303,7 @@ Two safety nets prevent low-quality output:
   install `llama-cpp-python` via pip).
 - Python 3.10 – 3.12.
 - ~4 GB RAM free for the Q4 model.
+- or download direct ** from this link ** https://github.com/abetlen/llama-cpp-python/releases/tag/v0.3.23-cu125
 
 #### Install
 ```powershell
@@ -435,6 +436,167 @@ This section summarizes the latest practical changes added to the codebase.
     - `training_memory/qa_memory_log.jsonl` stores QA answer snapshots.
     - `training_memory/qa_memory_review.jsonl` stores review decisions
        (approved/rejected) for QA entries.
+
+
+# Running Python Libraries in RAM or Temporary Storage Without Permanent Installation (Windows)
+
+This guide explains how to run Python libraries on a restricted or protected Windows system without permanently installing packages.
+
+---
+
+# Problem
+
+Some Windows environments may:
+
+- Block Administrator access
+- Prevent normal `pip install`
+- Restrict writing to `site-packages`
+- Block software installation via security policies
+
+However, Python packages can still be loaded temporarily using:
+
+- RAM
+- TEMP directories
+- Portable Python environments
+
+---
+
+# Required Libraries
+
+```bash
+pip install flask pypdf python-docx openpyxl sqlalchemy psutil
+```
+
+---
+
+# Method 1 — Install into TEMP Directory
+
+## Step 1: Create a temporary folder
+
+Open CMD:
+
+```bash
+mkdir %TEMP%\pydeps
+```
+
+---
+
+## Step 2: Install packages into the temporary folder
+
+```bash
+pip install --target=%TEMP%\pydeps flask pypdf python-docx openpyxl sqlalchemy psutil
+```
+
+If `pip` is blocked:
+
+```bash
+python -m pip install --target=%TEMP%\pydeps flask pypdf python-docx openpyxl sqlalchemy psutil
+```
+
+---
+
+## Step 3: Run Python using the temporary packages
+
+Before running your application:
+
+```bash
+set PYTHONPATH=%TEMP%\pydeps
+```
+
+Then:
+
+```bash
+python web2.py
+```
+
+---
+
+# One-Line Execution
+
+```bash
+set PYTHONPATH=%TEMP%\pydeps && python web2.py
+```
+
+---
+
+# Using PowerShell
+
+Instead of `set`, use:
+
+```powershell
+$env:PYTHONPATH="$env:TEMP\pydeps"
+python web2.py
+```
+
+---
+
+# Verify the Installation
+
+Run Python:
+
+```bash
+python
+```
+
+Then test:
+
+```python
+import flask
+import pypdf
+import docx
+import openpyxl
+import sqlalchemy
+import psutil
+
+print("OK")
+```
+
+If you see:
+
+```python
+OK
+```
+
+Everything is working correctly.
+
+---
+
+# Method 2 — Install WHL Files Manually
+
+If internet access or pip is blocked:
+
+Download `.whl` files manually and install them:
+
+```bash
+pip install --target=%TEMP%\pydeps package.whl
+```
+
+Example:
+
+```bash
+pip install --target=%TEMP%\pydeps flask-3.1.0-py3-none-any.whl
+```
+
+---
+
+# Method 3 — Use Portable Python
+
+You can use a portable Python distribution that requires no installation.
+
+Examples:
+
+- WinPython
+- Python Embeddable Package
+
+---
+
+# Cleanup Temporary Files
+
+To remove the temporary packages:
+
+```bash
+rmdir /s /q %TEMP%\pydeps
+```
 
 ---
 
@@ -763,6 +925,167 @@ curl -X POST http://127.0.0.1:5000/api/eval/run
        (قبول/رفض) لكل عنصر QA.
 
 ---
+
+# تشغيل مكتبات Python على RAM أو مجلد مؤقت بدون تثبيت دائم (Windows)
+
+هذا الدليل يشرح كيفية تشغيل مكتبات Python على نظام Windows محمي أو محدود الصلاحيات بدون تثبيت دائم على الجهاز.
+
+---
+
+# المشكلة
+
+في بعض أجهزة Windows:
+
+- لا توجد صلاحيات Administrator
+- يتم منع `pip install`
+- لا يمكن الكتابة داخل `site-packages`
+- برامج الحماية تمنع تثبيت المكتبات
+
+لكن ما زال بالإمكان تشغيل المكتبات مؤقتًا داخل:
+
+- RAM
+- مجلد TEMP
+- أو بيئة محمولة Portable
+
+---
+
+# المكتبات المطلوبة
+
+```bash
+pip install flask pypdf python-docx openpyxl sqlalchemy psutil
+```
+
+---
+
+# الطريقة 1 — التثبيت داخل مجلد TEMP (بدون تثبيت دائم)
+
+## الخطوة 1: إنشاء مجلد مؤقت
+
+افتح CMD ثم نفّذ:
+
+```bash
+mkdir %TEMP%\pydeps
+```
+
+---
+
+## الخطوة 2: تثبيت المكتبات داخل المجلد المؤقت
+
+```bash
+pip install --target=%TEMP%\pydeps flask pypdf python-docx openpyxl sqlalchemy psutil
+```
+
+أو إذا كان `pip` لا يعمل مباشرة:
+
+```bash
+python -m pip install --target=%TEMP%\pydeps flask pypdf python-docx openpyxl sqlalchemy psutil
+```
+
+---
+
+## الخطوة 3: تشغيل Python باستخدام المكتبات المؤقتة
+
+قبل تشغيل البرنامج:
+
+```bash
+set PYTHONPATH=%TEMP%\pydeps
+```
+
+ثم:
+
+```bash
+python web2.py
+```
+
+---
+
+# تشغيل بسطر واحد
+
+```bash
+set PYTHONPATH=%TEMP%\pydeps && python web2.py
+```
+
+---
+
+# استخدام PowerShell
+
+بدل `set` استخدم:
+
+```powershell
+$env:PYTHONPATH="$env:TEMP\pydeps"
+python web2.py
+```
+
+---
+
+# اختبار أن المكتبات تعمل
+
+شغّل Python:
+
+```bash
+python
+```
+
+ثم:
+
+```python
+import flask
+import pypdf
+import docx
+import openpyxl
+import sqlalchemy
+import psutil
+
+print("OK")
+```
+
+إذا ظهرت:
+
+```python
+OK
+```
+
+فكل شيء يعمل بشكل صحيح.
+
+---
+
+# الطريقة 2 — تثبيت ملفات WHL يدويًا
+
+إذا كان الإنترنت أو pip محجوب:
+
+حمّل ملفات `.whl` يدويًا ثم:
+
+```bash
+pip install --target=%TEMP%\pydeps اسم_الملف.whl
+```
+
+مثال:
+
+```bash
+pip install --target=%TEMP%\pydeps flask-3.1.0-py3-none-any.whl
+```
+
+---
+
+# الطريقة 3 — استخدام Portable Python
+
+يمكن استخدام نسخة Python محمولة بدون تثبيت على النظام.
+
+أمثلة:
+
+- WinPython
+- Python Embeddable Package
+
+---
+
+# تنظيف الملفات المؤقتة
+
+لحذف المكتبات المؤقتة:
+
+```bash
+rmdir /s /q %TEMP%\pydeps
+```
+
 
 > **رخصة:** الاستخدام الداخلي فقط ضمن مساحة العمل الحالية. أوزان نموذج
 > Phi-3 خاضعة لرخصة Microsoft الخاصة بها.
