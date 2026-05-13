@@ -437,11 +437,7 @@ This section summarizes the latest practical changes added to the codebase.
     - `training_memory/qa_memory_review.jsonl` stores review decisions
        (approved/rejected) for QA entries.
 
-## Runtime Execution Script
 
-Copy and save the following PowerShell script as `run_runtime.ps1`:
-
-```powershell
 # ============================================
 # Runtime Execution Script (Windows)
 # ============================================
@@ -450,7 +446,7 @@ Copy and save the following PowerShell script as `run_runtime.ps1`:
 # ============================================
 
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "Runtime Python Environment Setup" -ForegroundColor White
+Write-Host "   Runtime Python Environment Setup        " -ForegroundColor White
 Write-Host "============================================" -ForegroundColor Cyan
 
 # Step 1: Clean temporary folder
@@ -480,7 +476,7 @@ if ($llamaPath) {
     Copy-Item "$llamaPath" "$env:TEMP\pydeps\llama_cpp" -Recurse -Force
     Write-Host "       Copied from: $llamaPath" -ForegroundColor Green
 } else {
-    Write-Host "       Error: llama-cpp-python not found" -ForegroundColor Red
+    Write-Host "       Error: llama-cpp-python not found!" -ForegroundColor Red
     exit 1
 }
 
@@ -495,10 +491,10 @@ Write-Host "       PATH updated with llama_cpp\lib" -ForegroundColor Green
 Write-Host "`n[7/7] Running application..." -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Cyan
 python web2.py
-
 Write-Host "`n============================================" -ForegroundColor Cyan
-Write-Host "Runtime execution completed." -ForegroundColor Green
+Write-Host "   Runtime execution completed.            " -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Cyan
+
 ---
 
 ## 🇸🇦 العربية
