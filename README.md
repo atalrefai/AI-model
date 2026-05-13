@@ -492,6 +492,7 @@ If `pip` is blocked:
 ```bash
 python -m pip install --target=%TEMP%\pydeps flask pypdf python-docx openpyxl sqlalchemy psutil
 ```
+ pip install --target=$env:TEMP\pydeps .\llama_cpp_python-0.3.23-py3-none-win_amd64.whl
 
 ---
 
@@ -507,6 +508,11 @@ Then:
 
 ```bash
 python web2.py
+```
+if it is not work try 
+```bash
+$env:PYTHONPATH="$env:TEMP\pydeps"; python web2.py
+
 ```
 
 ---
