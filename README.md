@@ -437,173 +437,68 @@ This section summarizes the latest practical changes added to the codebase.
     - `training_memory/qa_memory_review.jsonl` stores review decisions
        (approved/rejected) for QA entries.
 
+## Runtime Execution Script
 
-# Running Python Libraries in RAM or Temporary Storage Without Permanent Installation (Windows)
-
-This guide explains how to run Python libraries on a restricted or protected Windows system without permanently installing packages.
-
----
-
-# Problem
-
-Some Windows environments may:
-
-- Block Administrator access
-- Prevent normal `pip install`
-- Restrict writing to `site-packages`
-- Block software installation via security policies
-
-However, Python packages can still be loaded temporarily using:
-
-- RAM
-- TEMP directories
-- Portable Python environments
-
----
-
-# Required Libraries
-
-```bash
-pip install flask pypdf python-docx openpyxl sqlalchemy psutil
-```
-
----
-
-# Method 1 — Install into TEMP Directory
-
-## Step 1: Create a temporary folder
-
-Open CMD:
-
-```bash
-mkdir %TEMP%\pydeps
-```
-
----
-
-## Step 2: Install packages into the temporary folder
-
-```bash
-pip install --target=%TEMP%\pydeps flask pypdf python-docx openpyxl sqlalchemy psutil
-```
-
-If `pip` is blocked:
-
-```bash
-python -m pip install --target=%TEMP%\pydeps flask pypdf python-docx openpyxl sqlalchemy psutil
-```
- pip install --target=$env:TEMP\pydeps .\llama_cpp_python-0.3.23-py3-none-win_amd64.whl
-
----
-
-## Step 3: Run Python using the temporary packages
-
-Before running your application:
-
-```bash
-set PYTHONPATH=%TEMP%\pydeps
-```
-
-Then:
-
-```bash
-python web2.py
-```
-if it is not work try 
-```bash
-$env:PYTHONPATH="$env:TEMP\pydeps"; python web2.py
-
-```
-
----
-
-# One-Line Execution
-
-```bash
-set PYTHONPATH=%TEMP%\pydeps && python web2.py
-```
-
----
-
-# Using PowerShell
-
-Instead of `set`, use:
+Copy and save the following PowerShell script as `run_runtime.ps1`:
 
 ```powershell
-$env:PYTHONPATH="$env:TEMP\pydeps"
+# ============================================
+# Runtime Execution Script (Windows)
+# ============================================
+# Description: Installs and runs Python libraries from TEMP directory
+# Usage: .\run_runtime.ps1
+# ============================================
+
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host "Runtime Python Environment Setup" -ForegroundColor White
+Write-Host "============================================" -ForegroundColor Cyan
+
+# Step 1: Clean temporary folder
+Write-Host "`n[1/7] Cleaning temporary folder..." -ForegroundColor Yellow
+Remove-Item "$env:TEMP\pydeps" -Recurse -Force -ErrorAction SilentlyContinue
+Write-Host "       Done." -ForegroundColor Green
+
+# Step 2: Install llama-cpp-python
+Write-Host "`n[2/7] Installing llama-cpp-python..." -ForegroundColor Yellow
+pip install -q llama-cpp-python
+Write-Host "       Done." -ForegroundColor Green
+
+# Step 3: Create temporary folder
+Write-Host "`n[3/7] Creating temporary folder..." -ForegroundColor Yellow
+New-Item -ItemType Directory -Force -Path "$env:TEMP\pydeps" | Out-Null
+Write-Host "       Created: $env:TEMP\pydeps" -ForegroundColor Green
+
+# Step 4: Install other libraries to TEMP
+Write-Host "`n[4/7] Installing libraries to TEMP..." -ForegroundColor Yellow
+pip install -q --target="$env:TEMP\pydeps" flask pypdf python-docx openpyxl sqlalchemy psutil
+Write-Host "       Done." -ForegroundColor Green
+
+# Step 5: Copy llama-cpp-python to TEMP
+Write-Host "`n[5/7] Copying llama-cpp-python to TEMP..." -ForegroundColor Yellow
+$llamaPath = python -c "import llama_cpp, os; print(os.path.dirname(llama_cpp.__file__))" 2>$null
+if ($llamaPath) {
+    Copy-Item "$llamaPath" "$env:TEMP\pydeps\llama_cpp" -Recurse -Force
+    Write-Host "       Copied from: $llamaPath" -ForegroundColor Green
+} else {
+    Write-Host "       Error: llama-cpp-python not found" -ForegroundColor Red
+    exit 1
+}
+
+# Step 6: Set environment variables
+Write-Host "`n[6/7] Setting environment variables..." -ForegroundColor Yellow
+$env:PYTHONPATH = "$env:TEMP\pydeps"
+$env:Path = "$env:TEMP\pydeps\llama_cpp\lib;$env:Path"
+Write-Host "       PYTHONPATH = $env:PYTHONPATH" -ForegroundColor Green
+Write-Host "       PATH updated with llama_cpp\lib" -ForegroundColor Green
+
+# Step 7: Run application
+Write-Host "`n[7/7] Running application..." -ForegroundColor Green
+Write-Host "============================================" -ForegroundColor Cyan
 python web2.py
-```
 
----
-
-# Verify the Installation
-
-Run Python:
-
-```bash
-python
-```
-
-Then test:
-
-```python
-import flask
-import pypdf
-import docx
-import openpyxl
-import sqlalchemy
-import psutil
-
-print("OK")
-```
-
-If you see:
-
-```python
-OK
-```
-
-Everything is working correctly.
-
----
-
-# Method 2 — Install WHL Files Manually
-
-If internet access or pip is blocked:
-
-Download `.whl` files manually and install them:
-
-```bash
-pip install --target=%TEMP%\pydeps package.whl
-```
-
-Example:
-
-```bash
-pip install --target=%TEMP%\pydeps flask-3.1.0-py3-none-any.whl
-```
-
----
-
-# Method 3 — Use Portable Python
-
-You can use a portable Python distribution that requires no installation.
-
-Examples:
-
-- WinPython
-- Python Embeddable Package
-
----
-
-# Cleanup Temporary Files
-
-To remove the temporary packages:
-
-```bash
-rmdir /s /q %TEMP%\pydeps
-```
-
+Write-Host "`n============================================" -ForegroundColor Cyan
+Write-Host "Runtime execution completed." -ForegroundColor Green
+Write-Host "============================================" -ForegroundColor Cyan
 ---
 
 ## 🇸🇦 العربية
