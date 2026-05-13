@@ -445,31 +445,40 @@ This section summarizes the latest practical changes added to the codebase.
 # Usage: .\run_runtime.ps1
 # ============================================
 
+
+```powershell
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "   Runtime Python Environment Setup        " -ForegroundColor White
 Write-Host "============================================" -ForegroundColor Cyan
+```
 
 # Step 1: Clean temporary folder
+```powershell
 Write-Host "`n[1/7] Cleaning temporary folder..." -ForegroundColor Yellow
 Remove-Item "$env:TEMP\pydeps" -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host "       Done." -ForegroundColor Green
+```
 
 # Step 2: Install llama-cpp-python
+```powershell
 Write-Host "`n[2/7] Installing llama-cpp-python..." -ForegroundColor Yellow
 pip install -q llama-cpp-python
 Write-Host "       Done." -ForegroundColor Green
-
+```
 # Step 3: Create temporary folder
+```powershell
 Write-Host "`n[3/7] Creating temporary folder..." -ForegroundColor Yellow
 New-Item -ItemType Directory -Force -Path "$env:TEMP\pydeps" | Out-Null
 Write-Host "       Created: $env:TEMP\pydeps" -ForegroundColor Green
-
+```
 # Step 4: Install other libraries to TEMP
+```powershell
 Write-Host "`n[4/7] Installing libraries to TEMP..." -ForegroundColor Yellow
 pip install -q --target="$env:TEMP\pydeps" flask pypdf python-docx openpyxl sqlalchemy psutil
 Write-Host "       Done." -ForegroundColor Green
-
+```
 # Step 5: Copy llama-cpp-python to TEMP
+```powershell
 Write-Host "`n[5/7] Copying llama-cpp-python to TEMP..." -ForegroundColor Yellow
 $llamaPath = python -c "import llama_cpp, os; print(os.path.dirname(llama_cpp.__file__))" 2>$null
 if ($llamaPath) {
@@ -479,22 +488,24 @@ if ($llamaPath) {
     Write-Host "       Error: llama-cpp-python not found!" -ForegroundColor Red
     exit 1
 }
-
+```
 # Step 6: Set environment variables
+```powershell
 Write-Host "`n[6/7] Setting environment variables..." -ForegroundColor Yellow
 $env:PYTHONPATH = "$env:TEMP\pydeps"
 $env:Path = "$env:TEMP\pydeps\llama_cpp\lib;$env:Path"
 Write-Host "       PYTHONPATH = $env:PYTHONPATH" -ForegroundColor Green
 Write-Host "       PATH updated with llama_cpp\lib" -ForegroundColor Green
-
+```
 # Step 7: Run application
+```powershell
 Write-Host "`n[7/7] Running application..." -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Cyan
 python web2.py
 Write-Host "`n============================================" -ForegroundColor Cyan
 Write-Host "   Runtime execution completed.            " -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Cyan
-
+```
 ---
 
 ## 🇸🇦 العربية
